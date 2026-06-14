@@ -36,11 +36,14 @@ class Order(BaseModel):
     created_at: datetime = Field(default_factory=datetime.now)
     assigned_transport_id: Optional[str] = None
     cluster_id: Optional[str] = None
+
+    mass_kg: float = Field(..., gt=0, description="Order mass in kg")
+    ready_time: datetime = Field(..., description="Time when item is ready for pickup")
     
     @property
     def pickup_ready_time(self) -> datetime:
         """Time when order is ready for pickup (from clustering task)"""
-        return self.time_window.start
+        return self.ready_time
     
     @property
     def deadline(self) -> datetime:
@@ -50,7 +53,7 @@ class Order(BaseModel):
     @property
     def weight(self) -> float:
         """Order weight (from clustering task)"""
-        return self.demand
+        return self.mass_kg
     
     class Config:
         json_encoders = {

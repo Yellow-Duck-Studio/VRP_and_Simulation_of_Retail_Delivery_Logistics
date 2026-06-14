@@ -115,7 +115,7 @@ class StateManager:
     def get_available_vehicles(self, warehouse_id: Optional[str] = None) -> List[Transport]:
         vehicles = [v for v in self.vehicles.values() if v.is_available()]
         if warehouse_id:
-            vehicles = [v for v in vehicles if v.warehouse_id == warehouse_id]
+            vehicles = [v for v in vehicles if getattr(v, 'warehouse_id', None) == warehouse_id]
         return vehicles
     
     def save_state(self, timestamp: datetime) -> None:

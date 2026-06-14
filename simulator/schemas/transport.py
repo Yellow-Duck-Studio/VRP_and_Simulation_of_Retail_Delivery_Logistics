@@ -13,15 +13,15 @@ class TransportStatus(str, Enum):
     MAINTENANCE = "maintenance"
 
 
-class TransportType(str, Enum):
-    FOOT = "foot"
-    BIKE = "bike"
-    CAR = "car"
+class AffiliationType(str, Enum):
+    SHIFT = "shift"
+    EXCHANGE = "exchange"
+    TPL = "tpl"
 
 
 class Transport(BaseModel):
     transport_id: str
-    vehicle_type: TransportType
+    courier_type_id: str = Field(..., description="Courier type id")
     capacity: float = Field(..., gt=0, description="Vehicle capacity in units")
     current_location: Location
     current_load: float = Field(default=0.0, ge=0, description="Current load in units")
@@ -31,6 +31,7 @@ class Transport(BaseModel):
     fuel_level: float | None = Field(default=100.0, ge=0, le=100, description="Fuel percentage")
     speed_kmh: float | None = Field(default=50.0, gt=0, description="Average speed in km/h")
     last_updated: datetime = Field(default_factory=datetime.now)
+    affiliation_type: AffiliationType = Field(..., description="Transport affiliation type")
     
     def available_capacity(self) -> float:
         return self.capacity - self.current_load
