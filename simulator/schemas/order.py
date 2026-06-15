@@ -30,13 +30,11 @@ class Order(BaseModel):
     customer_id: str
     warehouse_id: str = Field(..., description="Warehouse this order is bound to")
     location: Location
-    demand: float = Field(..., gt=0, description="Demand in units (weight, volume, etc.)")
     time_window: TimeWindow
     status: OrderStatus = OrderStatus.PENDING
     created_at: datetime = Field(default_factory=datetime.now)
     assigned_transport_id: Optional[str] = None
     cluster_id: Optional[str] = None
-
     mass_kg: float = Field(..., gt=0, description="Order mass in kg")
     ready_time: datetime = Field(..., description="Time when item is ready for pickup")
     
