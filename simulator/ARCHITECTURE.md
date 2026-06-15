@@ -30,8 +30,8 @@ Simulator for retail delivery logistics and Vehicle Routing Problem (VRP) optimi
   - Sequence of stops, estimated times, distances
   - Optimized using VRP algorithms
   
-- **Customer**: Delivery recipients
-  - Location, demand patterns, service constraints
+- **Courier Type**: Type of courier
+  - Type ID, name, capacity, speed
 
 ### 3. Utilities (`simulator/utils/`)
 
@@ -61,7 +61,7 @@ Orders Input  →  VRP Solver  →  Route Assignment  →  Simulation
 - [x] Implement Warehouse schema
 - [x] Implement Agent/Vehicle schema
 - [x] Implement Route schema
-- [x] Implement Customer schema
+- [x] Implement Courier Type schema
 
 ### Phase 2: Simulator Engine
 - [ ] Implement SimulationController

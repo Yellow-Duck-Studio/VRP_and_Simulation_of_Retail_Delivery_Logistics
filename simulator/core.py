@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .schemas import (
-    Order, Warehouse, Transport, Route, Customer,
+    Order, Warehouse, Transport, Route,
     OrderStatus, TransportStatus
 )
 
@@ -75,8 +75,8 @@ class StateManager:
         self.orders: Dict[str, Order] = {}
         self.warehouses: Dict[str, Warehouse] = {}
         self.vehicles: Dict[str, Transport] = {}
+        self.courier_types: Dict[str, CourierType] = {}
         self.routes: Dict[str, Route] = {}
-        self.customers: Dict[str, Customer] = {}
         self.history: List[dict] = []
     
     def add_order(self, order: Order) -> None:
@@ -87,12 +87,12 @@ class StateManager:
     
     def add_vehicle(self, vehicle: Transport) -> None:
         self.vehicles[vehicle.vehicle_id] = vehicle
+
+    def add_courier_type(self, courier_type: CourierType) -> None:
+        self.courier_types[courier_type.type_id] = courier_type
     
     def add_route(self, route: Route) -> None:
         self.routes[route.route_id] = route
-    
-    def add_customer(self, customer: Customer) -> None:
-        self.customers[customer.customer_id] = customer
     
     def get_order(self, order_id: str) -> Optional[Order]:
         return self.orders.get(order_id)
@@ -102,12 +102,12 @@ class StateManager:
     
     def get_vehicle(self, vehicle_id: str) -> Optional[Transport]:
         return self.vehicles.get(vehicle_id)
+
+    def get_courier_type(self, courier: Transport) -> Optional[CourierType]:
+        return self.courier_types.get(courier.courier_type_id)
     
     def get_route(self, route_id: str) -> Optional[Route]:
         return self.routes.get(route_id)
-    
-    def get_customer(self, customer_id: str) -> Optional[Customer]:
-        return self.customers.get(customer_id)
     
     def get_pending_orders(self) -> List[Order]:
         return [o for o in self.orders.values() if o.status == OrderStatus.PENDING]
