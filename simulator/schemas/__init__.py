@@ -1,6 +1,6 @@
 from .order import Order, OrderStatus, Location, TimeWindow
 from .warehouse import Warehouse, OperatingHours, InventoryItem
-from .transport import Transport, TransportStatus
+from .courier import Transport, TransportStatus
 from .courier_type import CourierType
 from .route import Route, RouteStop
 from .distance_matrix import DistanceMatrix
