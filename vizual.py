@@ -1,4 +1,6 @@
 import json
+import sys
+import argparse
 import pandas as pd
 import matplotlib.pyplot as plt
 import colorcet as cc
@@ -28,15 +30,6 @@ def visualize_clustering_variant(
 ):
     """
     Визуализирует все кластеры для выбранного варианта разбиения.
-
-    Параметры:
-    - polygon_id: идентификатор полигона (например "task_1")
-    - clustering_variants: словарь вида {polygon_id: [variant1, variant2, ...]}
-      где variant = list[list[int]] (список кластеров, каждый кластер = список ID заказов)
-    - variant_index: индекс варианта разбиения (0, 1, 2...)
-    - orders_df: DataFrame с колонками order_id, latitude, longitude, polygon_id
-    - warehouses_df: DataFrame с колонками warehouse_id, latitude, longitude, polygon_id
-    - figsize: размер фигуры
     """
 
     # 1. Проверяем существование полигона
@@ -44,19 +37,27 @@ def visualize_clustering_variant(
         raise ValueError(f"Полигон {polygon_id} не найден в clustering_variants")
 
     variants = clustering_variants[polygon_id]
-
-    polygon_id = int(polygon_id[5:])
-    if variant_index >= len(variants):
+    
+    # Защита от выхода за границы, если индекс передали вручную
+    if variant_index >= len(variants) or variant_index < -len(variants):
         raise IndexError(
-            f"variant_index={variant_index} превышает количество вариантов ({len(variants)}) для полигона {polygon_id}")
+            f"variant_index={variant_index} выходит за пределы диапазона. "
+            f"Доступно вариантов для {polygon_id}: {len(variants)} (индексы от 0 до {len(variants) - 1})"
+        )
 
     # 2. Выбираем нужный вариант разбиения
     selected_variant = variants[variant_index]  # список кластеров [[10,3,5], [1,2,4], ...]
 
+    # Для заголовка и фильтров получаем чистый числовой ID
+    try:
+        task_numeric_id = int(polygon_id.split('_')[1])
+    except (IndexError, ValueError):
+        task_numeric_id = polygon_id
+
     # 3. Фильтруем заказы только для этого полигона
-    orders_polygon = orders_df[orders_df['task_id'] == polygon_id]
+    orders_polygon = orders_df[orders_df['task_id'] == task_numeric_id]
     if orders_polygon.empty:
-        raise ValueError(f"Нет заказов для полигона {polygon_id} в orders_df")
+        raise ValueError(f"Нет заказов для полигона {task_numeric_id} в orders_df")
 
     # 4. Создаём словарь: заказ -> номер кластера (для раскраски)
     order_to_cluster = {}
@@ -65,7 +66,6 @@ def visualize_clustering_variant(
             order_to_cluster[order_id] = cluster_idx
 
     # 5. Готовим данные для отрисовки
-    # Создаём списки координат для каждого кластера
     cluster_data = {}  # cluster_idx -> {'lats': [], 'lons': []}
 
     for _, row in orders_polygon.iterrows():
@@ -79,7 +79,6 @@ def visualize_clustering_variant(
             cluster_data[cluster_idx]['lats'].append(lat)
             cluster_data[cluster_idx]['lons'].append(lon)
         else:
-            # Если заказ не попал ни в один кластер (шум) — помечаем серым
             if -1 not in cluster_data:
                 cluster_data[-1] = {'lats': [], 'lons': []}
             cluster_data[-1]['lats'].append(lat)
@@ -117,7 +116,7 @@ def visualize_clustering_variant(
                 label=f'Кластер {cluster_idx} (n={len(selected_variant[cluster_idx])})'
             )
 
-    warehouses_polygon = warehouses_df[warehouses_df['task_id'] == polygon_id]
+    warehouses_polygon = warehouses_df[warehouses_df['task_id'] == task_numeric_id]
     if not warehouses_polygon.empty:
         plt.scatter(
             warehouses_polygon['lon'],
@@ -140,32 +139,67 @@ def visualize_clustering_variant(
                 color='black'
             )
 
+    # Корректно отображаем реальный индекс (даже если передали -1 для последнего)
+    actual_index = variant_index if variant_index >= 0 else len(variants) + variant_index
+
     plt.xlabel('Долгота')
     plt.ylabel('Широта')
-    plt.title(f'Полигон {polygon_id} — вариант разбиения #{variant_index} (всего кластеров: {n_clusters})')
+    plt.title(f'Полигон {polygon_id} — вариант разбиения #{actual_index} (всего кластеров: {n_clusters})')
     plt.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
+    # Настраиваем парсер аргументов командной строки
+    parser = argparse.ArgumentParser(description="Визуализация разбиений кластеров для задач.")
+    
+    # Первый обязательный аргумент: номер задачи
+    parser.add_argument("task_num", type=int, help="Номер задачи (например, 1 для task_1)")
+    
+    # Второй опциональный аргумент: индекс разбиения. Если не указан, по умолчанию None
+    parser.add_argument("variant_idx", type=int, nargs="?", default=None, 
+                        help="Индекс разбиения. Если не указан, берется последнее существующее.")
+
+    args = parser.parse_args()
+
+    # Формируем polygon_id
+    polygon_id = f"task_{args.task_num}"
+
+    # Загружаем данные
+    print("Загрузка данных...")
     with open('data/master_clusterizations.json', 'r', encoding='utf-8') as file:
-        data = json.load(file)
+        clustering_variants = json.load(file)
 
-    orders_df = pd.read_csv('data/enriched_orders_2.csv')
+    orders_df = pd.read_csv('data/enriched_orders.csv')
+    warehouses_df = pd.read_csv('data/enriched_warehouses.csv')
 
-    warehouses_data = {
-        'warehouse_id': [1, 2],
-        'latitude': [55.75, 55.78],
-        'longitude': [37.60, 37.65],
-        'polygon_id': ['task_1', 'task_1']
-    }
-    warehouses_df = pd.read_csv('data/enriched_warehouses_2.csv')
+    # Проверяем наличие задачи в JSON
+    if polygon_id not in clustering_variants:
+        print(f"Ошибка: Задача {polygon_id} не найдена в master_clusterizations.json", file=sys.stderr)
+        sys.exit(1)
 
-    # Вызов функции
-    visualize_clustering_variant(
-        polygon_id="task_3",
-        clustering_variants=data,
-        variant_index=2972,
-        orders_df=orders_df,
-        warehouses_df=warehouses_df
-    )
+    variants = clustering_variants[polygon_id]
+    total_variants = len(variants)
+    print(f"Для {polygon_id} найдено всего вариантов разбиений: {total_variants}")
+
+    # Определяем нужный индекс разбиения
+    if args.variant_idx is None:
+        # Если параметр не передан — берем последний (индекс -1)
+        variant_index = -1
+        print(f"Параметр variant_index не указан. Автоматически выбрано последнее разбиение (индекс {total_variants - 1}).")
+    else:
+        variant_index = args.variant_idx
+        print(f"Запрошено конкретное разбиение с индексом: {variant_index}")
+
+    # Вызов функции визуализации с обработкой возможных исключений по индексам
+    try:
+        visualize_clustering_variant(
+            polygon_id=polygon_id,
+            clustering_variants=clustering_variants,
+            variant_index=variant_index,
+            orders_df=orders_df,
+            warehouses_df=warehouses_df
+        )
+    except (ValueError, IndexError) as e:
+        print(f"Ошибка при визуализации: {e}", file=sys.stderr)
+        sys.exit(1)
