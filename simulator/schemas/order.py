@@ -52,8 +52,3 @@ class Order(BaseModel):
     def weight(self) -> float:
         """Order weight (from clustering task)"""
         return self.mass_kg
-    
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
