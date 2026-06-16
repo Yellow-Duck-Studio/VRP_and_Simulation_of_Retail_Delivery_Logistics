@@ -151,7 +151,7 @@ if __name__ == "__main__":
     with open('data/master_clusterizations.json', 'r', encoding='utf-8') as file:
         data = json.load(file)
 
-    orders_df = pd.read_csv('data/enriched_orders_2.csv')
+    orders_df = pd.read_csv('data/enriched_orders 2.csv')
 
     warehouses_data = {
         'warehouse_id': [1, 2],
@@ -159,13 +159,13 @@ if __name__ == "__main__":
         'longitude': [37.60, 37.65],
         'polygon_id': ['task_1', 'task_1']
     }
-    warehouses_df = pd.read_csv('data/enriched_warehouses_2.csv')
+    warehouses_df = pd.read_csv('data/enriched_warehouses 2.csv')
 
     # Вызов функции
     visualize_clustering_variant(
         polygon_id="task_3",
         clustering_variants=data,
-        variant_index=2972,
+        variant_index=2000,
         orders_df=orders_df,
         warehouses_df=warehouses_df
     )
