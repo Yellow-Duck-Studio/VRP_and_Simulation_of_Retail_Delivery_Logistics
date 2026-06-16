@@ -4,18 +4,18 @@ from dataclasses import dataclass
 from enum import Enum
 
 from .schemas import (
-    Order, Warehouse, Transport, Route,
-    OrderStatus, TransportStatus
+    Order, Warehouse, Courier, CourierType, Route,
+    OrderStatus, DistanceMatrix
 )
 
 
 class EventType(str, Enum):
     ORDER_CREATED = "order_created"
     ORDER_ASSIGNED = "order_assigned"
-    VEHICLE_DEPARTED = "vehicle_departed"
-    VEHICLE_ARRIVED = "vehicle_arrived"
+    COURIER_DEPARTED = "courier_departed"
+    COURIER_ARRIVED = "courier_arrived"
     ORDER_DELIVERED = "order_delivered"
-    VEHICLE_RETURNED = "vehicle_returned"
+    COURIER_RETURNED = "courier_returned"
     SIMULATION_STARTED = "simulation_started"
     SIMULATION_ENDED = "simulation_ended"
 
@@ -34,12 +34,12 @@ class TimeManager:
         self.time_step = timedelta(minutes=time_step_minutes)
         self.start_time = start_time
         self.total_steps = 0
-    
+
     def advance(self) -> datetime:
         self.current_time += self.time_step
         self.total_steps += 1
         return self.current_time
-    
+
     def reset(self, start_time: Optional[datetime] = None) -> None:
         self.current_time = start_time or self.start_time
         self.total_steps = 0
@@ -49,23 +49,23 @@ class EventManager:
     def __init__(self):
         self.events: List[Event] = []
         self.event_handlers: Dict[EventType, List[Callable]] = {}
-    
+
     def subscribe(self, event_type: EventType, handler: Callable) -> None:
         if event_type not in self.event_handlers:
             self.event_handlers[event_type] = []
         self.event_handlers[event_type].append(handler)
-    
+
     def publish(self, event: Event) -> None:
         self.events.append(event)
         if event.event_type in self.event_handlers:
             for handler in self.event_handlers[event.event_type]:
                 handler(event)
-    
+
     def get_events(self, event_type: Optional[EventType] = None) -> List[Event]:
         if event_type:
             return [e for e in self.events if e.event_type == event_type]
         return self.events.copy()
-    
+
     def clear(self) -> None:
         self.events.clear()
 
@@ -74,58 +74,47 @@ class StateManager:
     def __init__(self):
         self.orders: Dict[str, Order] = {}
         self.warehouses: Dict[str, Warehouse] = {}
-        self.vehicles: Dict[str, Transport] = {}
+        self.couriers: Dict[str, Courier] = {}
         self.courier_types: Dict[str, CourierType] = {}
         self.routes: Dict[str, Route] = {}
+        self.distance_matrix: Optional[DistanceMatrix] = None
         self.history: List[dict] = []
-    
+        self.delivery_results: Dict[str, dict] = {}
+
     def add_order(self, order: Order) -> None:
         self.orders[order.order_id] = order
     
     def add_warehouse(self, warehouse: Warehouse) -> None:
         self.warehouses[warehouse.warehouse_id] = warehouse
-    
-    def add_vehicle(self, vehicle: Transport) -> None:
-        self.vehicles[vehicle.vehicle_id] = vehicle
+
+    def add_courier(self, courier: Courier) -> None:
+        self.couriers[courier.courier_id] = courier
 
     def add_courier_type(self, courier_type: CourierType) -> None:
         self.courier_types[courier_type.type_id] = courier_type
     
     def add_route(self, route: Route) -> None:
         self.routes[route.route_id] = route
-    
+
+    def set_distance_matrix(self, matrix: DistanceMatrix) -> None:
+        self.distance_matrix = matrix
+
     def get_order(self, order_id: str) -> Optional[Order]:
         return self.orders.get(order_id)
-    
-    def get_warehouse(self, warehouse_id: str) -> Optional[Warehouse]:
-        return self.warehouses.get(warehouse_id)
-    
-    def get_vehicle(self, vehicle_id: str) -> Optional[Transport]:
-        return self.vehicles.get(vehicle_id)
 
-    def get_courier_type(self, courier: Transport) -> Optional[CourierType]:
-        return self.courier_types.get(courier.courier_type_id)
-    
-    def get_route(self, route_id: str) -> Optional[Route]:
-        return self.routes.get(route_id)
-    
     def get_pending_orders(self) -> List[Order]:
         return [o for o in self.orders.values() if o.status == OrderStatus.PENDING]
-    
-    def get_available_vehicles(self, warehouse_id: Optional[str] = None) -> List[Transport]:
-        vehicles = [v for v in self.vehicles.values() if v.is_available()]
-        if warehouse_id:
-            vehicles = [v for v in vehicles if getattr(v, 'warehouse_id', None) == warehouse_id]
-        return vehicles
-    
+
+    def get_available_couriers(self) -> List[Courier]:
+        return [c for c in self.couriers.values() if c.is_available()]
+
     def save_state(self, timestamp: datetime) -> None:
         state = {
             "timestamp": timestamp.isoformat(),
             "orders_count": len(self.orders),
             "pending_orders": len(self.get_pending_orders()),
-            "vehicles_count": len(self.vehicles),
-            "available_vehicles": len(self.get_available_vehicles()),
-            "routes_count": len(self.routes),
+            "couriers_count": len(self.couriers),
+            "available_couriers": len(self.get_available_couriers()),
         }
         self.history.append(state)
     
@@ -135,15 +124,16 @@ class StateManager:
         
         delivered_orders = sum(1 for o in self.orders.values() if o.status == OrderStatus.DELIVERED)
         total_orders = len(self.orders)
-        
+
+        sla_hits = sum(1 for res in self.delivery_results.values() if res.get("sla_met", False))
+
         return {
             "total_orders": total_orders,
             "delivered_orders": delivered_orders,
-            "delivery_rate": delivered_orders / total_orders if total_orders > 0 else 0,
+            "sla_hit_rate": sla_hits / total_orders if total_orders > 0 else 0,
             "pending_orders": len(self.get_pending_orders()),
-            "total_vehicles": len(self.vehicles),
-            "available_vehicles": len(self.get_available_vehicles()),
-            "total_routes": len(self.routes),
+            "total_couriers": len(self.couriers),
+            "available_couriers": len(self.get_available_couriers()),
             "simulation_steps": len(self.history),
         }
 
@@ -155,9 +145,8 @@ class SimulationController:
         self.state_manager = StateManager()
         self.is_running = False
         self.max_steps: Optional[int] = None
-    
+
     def initialize(self) -> None:
-        """Initialize simulation with default setup"""
         self.event_manager.publish(Event(
             event_type=EventType.SIMULATION_STARTED,
             timestamp=self.time_manager.current_time,
@@ -204,11 +193,8 @@ class SimulationController:
     def stop(self) -> None:
         """Stop the simulation"""
         self.is_running = False
-    
+
+
     def get_metrics(self) -> dict:
         """Get current simulation metrics"""
         return self.state_manager.get_metrics()
-    
-    def get_current_time(self) -> datetime:
-        """Get current simulation time"""
-        return self.time_manager.current_time

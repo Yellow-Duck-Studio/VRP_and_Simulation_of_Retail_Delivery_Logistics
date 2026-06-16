@@ -7,6 +7,7 @@ from .core import (
     EventType,
 )
 from .schemas import *
+from .data_loader import load_simulation_data
 
 __all__ = [
     "SimulationController",
@@ -20,12 +21,9 @@ __all__ = [
     "Location",
     "TimeWindow",
     "Warehouse",
-    "OperatingHours",
-    "InventoryItem",
-    "Transport",
-    "TransportStatus",
-    "TransportType",
+    "Courier",
+    "CourierStatus",
+    "CourierType",
     "Route",
-    "RouteStop",
-    "Customer",
+    "load_simulation_data"
 ]
