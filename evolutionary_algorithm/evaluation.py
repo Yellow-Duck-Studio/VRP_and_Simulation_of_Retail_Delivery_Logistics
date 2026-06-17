@@ -61,44 +61,49 @@ def evaluate_clusterization_iut(trip_intervals: List[Tuple[float, float]], iut_w
 def evaluate_fitness(individual: Individual, orders: Dict[int, Order], constraints: Constraint,
                      warehouses: Dict[int, Tuple[float, float]]) -> Individual:
     """
-    Calculates fitness based on total travel time, standard penalties, AND temporal synchronization.
+    Calculates fitness based on total travel time, standard penalties,
+    temporal synchronization (IUT), and fleet size penalty.
     """
     total_time = 0.0
     penalty = 0.0
     is_valid = True
 
-    # We will store the (start_timestamp, end_timestamp) for every valid trip here
+    # Store intervals for IUT and track fleet size
     trip_intervals: List[Tuple[float, float]] = []
+    active_fleet_size = 0
 
     for trip in individual.trips.values():
         if not trip.order_ids:
             continue
 
+        active_fleet_size += 1
+
         trip_orders = [orders[oid] for oid in trip.order_ids]
 
-        # Constraint: Max Orders
+        # 1. Constraint: Max Orders
         if len(trip_orders) > constraints.max_order_count:
             penalty += 1000 * (len(trip_orders) - constraints.max_order_count)
             is_valid = False
 
-        # Constraint: Max Weight
+        # 2. Constraint: Max Weight
         total_weight = sum(o.total_mass_kg for o in trip_orders)
         max_allowed_weight = constraints.max_weight_per_transport[trip.transport_type]
         if total_weight > max_allowed_weight:
             penalty += 500 * (total_weight - max_allowed_weight)
             is_valid = False
 
-        # Simulate Route & Time
+        # 3. Simulate Route & Time
         trip_orders.sort(key=lambda x: x.delivery_deadline_at)
 
-        # The trip starts when the LAST item in the cluster is ready for pickup
+        # Initialize current_time to the latest pickup_ready_at in the cluster
         current_time = max(o.pickup_ready_at for o in trip_orders)
-        trip_start_timestamp = current_time.timestamp()  # Record start time
+        trip_start_timestamp = current_time.timestamp()
 
         speed_kmh = constraints.speeds_kmh[trip.transport_type]
         wh_lat, wh_lon = warehouses[trip.warehouse_id]
         current_lat, current_lon = wh_lat, wh_lon
 
+        # The actual routing loop
         for order in trip_orders:
             dist = haversine_distance(current_lat, current_lon, order.lat, order.lon)
             travel_time_hours = dist / speed_kmh
@@ -117,11 +122,15 @@ def evaluate_fitness(individual: Individual, orders: Dict[int, Order], constrain
         trip_end_timestamp = current_time.timestamp()
         trip_intervals.append((trip_start_timestamp, trip_end_timestamp))
 
-    # Calculate the temporal overlap penalty using the recorded intervals
-    sync_penalty = evaluate_clusterization_iut(trip_intervals, iut_weight=50.0)
+    # 4. Calculate the temporal overlap penalty (using the intervals captured above)
+    sync_penalty = evaluate_clusterization_iut(trip_intervals, iut_weight=10.0)
 
-    # Final fitness combines raw travel time, hard constraint penalties, and the soft sync penalty
-    individual.fitness_score = total_time + penalty + sync_penalty
+    # 5. Calculate the Fleet Size Penalty
+    fleet_weight = 2.0
+    fleet_penalty = active_fleet_size * fleet_weight
+
+    # 6. Final fitness compilation
+    individual.fitness_score = total_time + penalty + sync_penalty + fleet_penalty
     individual.is_valid = is_valid
 
     return individual
