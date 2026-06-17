@@ -1,7 +1,7 @@
 import math
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
-from .domain import Individual, Order, Constraint
+from domain import Individual, Order, Constraint
 
 
 # --- 1. Standard Distance Metrics ---
@@ -112,7 +112,7 @@ def evaluate_fitness(individual: Individual, orders: Dict[int, Order], constrain
 
             time_diff_seconds = (current_time - order.delivery_deadline_at).total_seconds()
             if time_diff_seconds > 0:
-                penalty += 100 * (time_diff_seconds / 60)
+                penalty += 100 * (time_diff_seconds / 60) # Penalty per minute late
                 is_valid = False
 
             current_lat, current_lon = order.lat, order.lon
