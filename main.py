@@ -39,7 +39,7 @@ def main():
             orders=isolated_orders,
             warehouses_dict=isolated_warehouses,
             constraints=constraints,
-            generations=300,  # Increase this for production
+            generations=500,  # Increase this for production
             population_size=50  # Increase this for production
         )
 
