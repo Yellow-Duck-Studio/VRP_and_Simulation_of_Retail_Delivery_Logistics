@@ -42,7 +42,7 @@
       "order_id": "ORD001",
       "customer_id": "CUST001",
       "warehouse_id": "WH_PYATEROCHKA_INNOPOLIS",
-      "location": {
+      "delivery_location": {
         "latitude": 55.7560,
         "longitude": 48.7450,
         "address": "Иннополис, ул. Университетская, д. 10, кв. 25"
@@ -58,7 +58,7 @@
       "order_id": "ORD002",
       "customer_id": "CUST002",
       "warehouse_id": "WH_PYATEROCHKA_INNOPOLIS",
-      "location": {
+      "delivery_location": {
         "latitude": 55.7535,
         "longitude": 48.7400,
         "address": "Иннополис, ул. Спортивная, д. 15, кв. 42"
@@ -74,7 +74,7 @@
       "order_id": "ORD003",
       "customer_id": "CUST003",
       "warehouse_id": "WH_PEREKRESTOK_INNOPOLIS",
-      "location": {
+      "delivery_location": {
         "latitude": 55.7510,
         "longitude": 48.7500,
         "address": "Иннополис, ул. Технопарк, д. 8, кв. 12"
@@ -90,7 +90,7 @@
       "order_id": "ORD004",
       "customer_id": "CUST004",
       "warehouse_id": "WH_PEREKRESTOK_INNOPOLIS",
-      "location": {
+      "delivery_location": {
         "latitude": 55.7555,
         "longitude": 48.7465,
         "address": "Иннополис, ул. Инновационная, д. 20, кв. 5"
@@ -106,7 +106,7 @@
       "order_id": "ORD005",
       "customer_id": "CUST005",
       "warehouse_id": "WH_PYATEROCHKA_INNOPOLIS",
-      "location": {
+      "delivery_location": {
         "latitude": 55.7525,
         "longitude": 48.7435,
         "address": "Иннополис, ул. Научная, д. 3, кв. 88"
