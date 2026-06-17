@@ -74,7 +74,7 @@ python3 -m simulator.main \
 The input JSON scheme file is defined in `simulator/schemas/input_schema.json`.
 
 The input JSON file should contain:
-- `warehouses`: Distribution centers with locations and capacity
+- `warehouses`: Distribution centers with locations
 - `courier_types`: Vehicle types with capacity and speed specifications
 - `couriers`: Fleet of delivery vehicles
 - `orders`: Customer delivery orders with time windows

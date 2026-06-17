@@ -1,12 +1,12 @@
 # Simulator Architecture
 
 ## Overview
-Simulator for retail delivery logistics and Vehicle Routing Problem (VRP) optimization with integrated clustering capabilities.
+Simulator for retail delivery logistics and Vehicle Routing Problem (VRP) optimization.
 
 ## System Components
 
 ### 1. Core Simulator Engine (`simulator/core.py`)
-- **SimulationController**: Main simulation orchestrator
+- **SimulationController**: Main simulation orchestrator; initialises the simulation
 - **TimeManager**: Handles simulation time progression
 - **EventManager**: Manages events (orders, vehicle movements, deliveries)
 - **StateManager**: Tracks system state at each time step
@@ -14,33 +14,37 @@ Simulator for retail delivery logistics and Vehicle Routing Problem (VRP) optimi
 ### 2. Data Schemas (`simulator/schemas/`)
 
 #### Core Entities
-- **Order**: Customer delivery orders
-  - Order ID, customer location, time windows, demand, priority
-  - Status: pending, assigned, in_transit, delivered, cancelled
+- **Order**: Delivery orders
+  - `order_id`, `warehouse_id`, `delivery_location`, `time_window` (when should be delivered), `mass_kg`, `ready_time`  
+  - Status: `pending`, `assigned`, `in_transit`, `delivered`, `cancelled`
   
 - **Warehouse**: Distribution centers
-  - Location, capacity, inventory, operating hours
-  - Transport fleet assignment
+  - `warehouse_id`, `location` (coordinates)
   
-- **Transport**: Delivery transports
-  - Transport ID, capacity, current location, route
-  - Status: idle, loading, delivering, returning
+- **Courier**: Delivery couriers
+  - `courier_id`, `courier_type_id`, `affiliation` (e.g., shift or exchange), `current_location`, `current_load`, 
+    `current_route_id` 
+    (path from current location to the goal), `planned_route_ids` (list of routes)  
+  - Status: `idle`, `loading`, `delivering`, `returning`
   
 - **Route**: Planned delivery routes
-  - Sequence of stops, estimated times, distances
-  - Optimized using VRP algorithms
+  - `route_id`, `courier_id`, `start_location`, `end_location`, `total_duration_minutes`, `total_distance_km`, `status` (planned 
+    / in progress / completed)  
+  - Optimised by the VRP solver; may be re‑planned dynamically.
   
 - **Courier Type**: Type of courier
-  - Type ID, name, capacity, speed
-
-### 3. Utilities (`simulator/utils/`)
+  - `type_id`, `name`, `capacity_kg`, `speed_kmh`
+  
+- **Distance matrix**: Travel distance between locations
+  - Tuple of distances of travel distances between all relevant locations
 
 ## Data Flow
 
 ```
-Orders Input  →  VRP Solver  →  Route Assignment  →  Simulation
-     ↓               ↓                 ↓                 ↓
- Database     Optimized Routes   Vehicle Fleet    Success Verdict
+Input JSON → Schema Validation → State Initialization → Simulation Loop
+     ↓               ↓                  ↓                    ↓
+ Warehouses      Orders           Couriers           Events (step)
+ Couriers        Routes           Time               Metrics
 ```
 
 ## Integration Points
@@ -53,6 +57,7 @@ Orders Input  →  VRP Solver  →  Route Assignment  →  Simulation
 ## Technology Stack
 - **Language**: Python 3.10+
 - **Data Structures**: Pydantic for schema validation
+- **Testing**: pytest (unit & integration)
 
 ## Development Phases
 
@@ -64,10 +69,10 @@ Orders Input  →  VRP Solver  →  Route Assignment  →  Simulation
 - [x] Implement Courier Type schema
 
 ### Phase 2: Simulator Engine
-- [ ] Implement SimulationController
-- [ ] Implement TimeManager
-- [ ] Implement EventManager
-- [ ] Implement StateManager
+- [x] Implement SimulationController
+- [x] Implement TimeManager
+- [x] Implement EventManager
+- [x] Implement StateManager
 
 ### Phase 3: VRP Solver
 - [ ] Implement basic CVRP solver

@@ -27,9 +27,8 @@ class TimeWindow(BaseModel):
 
 class Order(BaseModel):
     order_id: str
-    customer_id: str
     warehouse_id: str = Field(..., description="Warehouse this order is bound to")
-    location: Location
+    delivery_location: Location
     time_window: TimeWindow
     status: OrderStatus = OrderStatus.PENDING
     created_at: datetime = Field(default_factory=datetime.now)

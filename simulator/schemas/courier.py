@@ -3,6 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 from enum import Enum
 from .order import Location
+from .courier_type import CourierType
 
 
 class CourierStatus(str, Enum):
