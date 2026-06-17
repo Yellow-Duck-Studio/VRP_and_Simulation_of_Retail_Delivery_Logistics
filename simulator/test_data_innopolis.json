@@ -40,7 +40,6 @@
   "orders": [
     {
       "order_id": "ORD001",
-      "customer_id": "CUST001",
       "warehouse_id": "WH_PYATEROCHKA_INNOPOLIS",
       "delivery_location": {
         "latitude": 55.7560,
@@ -56,7 +55,6 @@
     },
     {
       "order_id": "ORD002",
-      "customer_id": "CUST002",
       "warehouse_id": "WH_PYATEROCHKA_INNOPOLIS",
       "delivery_location": {
         "latitude": 55.7535,
@@ -72,7 +70,6 @@
     },
     {
       "order_id": "ORD003",
-      "customer_id": "CUST003",
       "warehouse_id": "WH_PEREKRESTOK_INNOPOLIS",
       "delivery_location": {
         "latitude": 55.7510,
@@ -88,7 +85,6 @@
     },
     {
       "order_id": "ORD004",
-      "customer_id": "CUST004",
       "warehouse_id": "WH_PEREKRESTOK_INNOPOLIS",
       "delivery_location": {
         "latitude": 55.7555,
@@ -104,7 +100,6 @@
     },
     {
       "order_id": "ORD005",
-      "customer_id": "CUST005",
       "warehouse_id": "WH_PYATEROCHKA_INNOPOLIS",
       "delivery_location": {
         "latitude": 55.7525,
