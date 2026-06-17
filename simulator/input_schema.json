@@ -41,9 +41,8 @@
         "type": "object",
         "properties": {
           "order_id": { "type": "string" },
-          "customer_id": { "type": "string" },
           "warehouse_id": { "type": "string" },
-          "location": {
+          "delivery_location": {
             "type": "object",
             "properties": {
               "latitude": { "type": "number" },
@@ -64,7 +63,7 @@
           "mass_kg": { "type": "number", "exclusiveMinimum": 0 },
           "ready_time": { "type": "string", "format": "date-time" }
         },
-        "required": ["order_id", "customer_id", "warehouse_id", "location", "time_window", "mass_kg", "ready_time"]
+        "required": ["order_id", "warehouse_id", "delivery_location", "time_window", "mass_kg", "ready_time"]
       }
     },
     "couriers": {
@@ -99,7 +98,7 @@
         "type": "object",
         "properties": {
           "route_id": { "type": "string" },
-          "transport_id": { "type": "string" },
+          "courier_id": { "type": "string" },
           "warehouse_id": { "type": "string" },
           "start_location": {
             "type": "object",
@@ -123,7 +122,7 @@
           "total_duration_minutes": { "type": "integer", "minimum": 0 },
           "status": { "type": "string" }
         },
-        "required": ["route_id", "transport_id", "warehouse_id", "start_location", "end_location", "start_time", "end_time"]
+        "required": ["route_id", "courier_id", "warehouse_id", "start_location", "end_location", "start_time", "end_time"]
       }
     },
     "distance_matrix": {

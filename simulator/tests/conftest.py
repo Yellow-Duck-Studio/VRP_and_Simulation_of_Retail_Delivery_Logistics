@@ -17,9 +17,8 @@ def sample_json_data():
         "orders": [
             {
                 "order_id": "ord_1",
-                "customer_id": "cust_1",
                 "warehouse_id": "wh_1",
-                "location": {"latitude": 55.75, "longitude": 37.61},
+                "delivery_location": {"latitude": 55.75, "longitude": 37.61},
                 "time_window": {
                     "start": (now - timedelta(minutes=10)).isoformat(),
                     "end": (now + timedelta(minutes=60)).isoformat()
@@ -43,7 +42,7 @@ def sample_json_data():
         "routes": [
             {
                 "route_id": "route_1",
-                "transport_id": "cour_1",
+                "courier_id": "cour_1",
                 "warehouse_id": "wh_1",
                 "start_location": {"latitude": 55.7558, "longitude": 37.6173},
                 "end_location": {"latitude": 55.75, "longitude": 37.61},
