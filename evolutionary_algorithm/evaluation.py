@@ -1,7 +1,7 @@
 import math
 from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
-from domain import Individual, Order, Constraint
+from evolutionary_algorithm.domain import Individual, Order, Constraint
 
 
 # --- 1. Standard Distance Metrics ---
@@ -126,7 +126,7 @@ def evaluate_fitness(individual: Individual, orders: Dict[int, Order], constrain
     sync_penalty = evaluate_clusterization_iut(trip_intervals, iut_weight=10.0)
 
     # 5. Calculate the Fleet Size Penalty
-    fleet_weight = 2.0
+    fleet_weight = 0.5
     fleet_penalty = active_fleet_size * fleet_weight
 
     # 6. Final fitness compilation

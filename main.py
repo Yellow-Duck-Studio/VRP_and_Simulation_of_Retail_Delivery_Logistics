@@ -8,8 +8,8 @@ def main():
     print("Loading comprehensive datasets...")
 
     # 1. Load data automatically grouped by task_id
-    tasks_orders = load_all_orders('data/enriched_orders 2.csv')
-    tasks_warehouses = load_all_warehouses('data/enriched_warehouses 2.csv')
+    tasks_orders = load_all_orders('data/orders.csv')
+    tasks_warehouses = load_all_warehouses('data/warehouses.csv')
     speeds, max_payloads = load_transport_constraints('data/transport_types.csv')
 
     # Define universal constraints for all tasks
@@ -39,7 +39,7 @@ def main():
             orders=isolated_orders,
             warehouses_dict=isolated_warehouses,
             constraints=constraints,
-            generations=500,  # Increase this for production
+            generations=300,  # Increase this for production
             population_size=50  # Increase this for production
         )
 
