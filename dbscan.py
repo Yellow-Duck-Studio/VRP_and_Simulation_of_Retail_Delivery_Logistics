@@ -29,6 +29,7 @@ Pipeline:
      to hand to the EA as seeded individuals.
 """
 
+import json
 import math
 from dataclasses import dataclass
 from datetime import datetime
@@ -347,30 +348,65 @@ def validate_clusterization(individual: Clusterization, orders: List[Order]) -> 
 
 
 # ---------------------------------------------------------------------------
+# 8. JSON export
+# ---------------------------------------------------------------------------
+
+def trip_to_json(trip: Trip) -> List[int]:
+    """A trip is just its order_ids, as a plain array — warehouse_id and
+    transport_type still live on the Trip object internally, they're just
+    not part of this strict output format."""
+    return sorted(trip.order_ids)
+
+
+def clusterization_to_json(individual: Clusterization) -> List[List[int]]:
+    """One candidate solution -> a list of order_id arrays, one per trip."""
+    return [trip_to_json(t) for t in individual]
+
+
+def population_to_json(task_id: int, population: List[Clusterization]) -> Dict[str, List[List[List[int]]]]:
+    """{"task_<id>": [clusterization, clusterization, ...]}."""
+    return {f"task_{task_id}": [clusterization_to_json(ind) for ind in population]}
+
+
+def write_population_json(task_id: int, population: List[Clusterization], path: str) -> None:
+    with open(path, "w") as f:
+        json.dump(population_to_json(task_id, population), f, indent=2)
+
+
+def write_multi_task_json(populations_by_task: Dict[int, List[Clusterization]], path: str) -> None:
+    """{"task_1": [...], "task_2": [...], ...} all in one file."""
+    combined: Dict[str, List[List[List[int]]]] = {}
+    for task_id, population in populations_by_task.items():
+        combined.update(population_to_json(task_id, population))
+    with open(path, "w") as f:
+        json.dump(combined, f, indent=2)
+
+
+# ---------------------------------------------------------------------------
 # Demo
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
     DATA_DIR = "data"
-    orders, warehouses, transport_types = load_task(1, DATA_DIR)
 
-    constraint = Constraint(
-        max_order_count=5,                                       # placeholder: plug in real Constraint values
-        max_weight_kg=max(t.max_payload_kg for t in transport_types),
-    )
+    populations_by_task: Dict[int, List[Clusterization]] = {}
+    for task_id in (1, 2, 3):
+        orders, warehouses, transport_types = load_task(task_id, DATA_DIR)
 
-    population = seed_population(orders, transport_types, constraint, n_individuals=2000, seed=42)
+        constraint = Constraint(
+            max_order_count=5,                                       # placeholder: plug in real Constraint values
+            max_weight_kg=max(t.max_payload_kg for t in transport_types),
+        )
 
-    print(f"Orders: {len(orders)}, warehouses: {len(warehouses)}, transport types: {[t.code for t in transport_types]}")
-    print(f"Distinct DBSCAN-seeded individuals generated: {len(population)}")
+        population = seed_population(orders, transport_types, constraint, n_individuals=2000, seed=42)
 
-    for ind in population[:3]:
-        validate_clusterization(ind, orders)
-    print("Coverage check passed on sample individuals (every order assigned exactly once, no noise).")
+        for ind in population[:3]:
+            validate_clusterization(ind, orders)
 
-    print("\nSample individual:")
-    for trip in population[0]:
-        print(f"  warehouse={trip.warehouse_id} transport={trip.transport_type} orders={sorted(trip.order_ids)}")
+        print(f"task_{task_id}: {len(orders)} orders, {len(warehouses)} warehouses -> {len(population)} distinct seeded individuals")
+        populations_by_task[task_id] = population
 
-    trip_counts = [len(ind) for ind in population]
-    print(f"\nTrip-count range across the seeded population: {min(trip_counts)}-{max(trip_counts)}")
+    out_path = "seed_population.json"
+    write_multi_task_json(populations_by_task, out_path)
+    print(f"\nWrote {out_path}")
+    print(f"Keys: {list(json.load(open(out_path)).keys())}")
