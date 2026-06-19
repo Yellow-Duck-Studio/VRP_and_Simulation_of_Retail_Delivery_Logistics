@@ -1,222 +1,109 @@
 """
 dbscan_seeding.py
 
-Seeds the evolutionary algorithm's initial population with DBSCAN-based
-clusterings instead of pure random individuals, per clustering_task.pdf:
+Drop-in replacement for the random init block in run_evolutionary_clustering().
 
-  orders: List[Order], warehouses: List[Warehouse], constraints: Constraint
-    -> clusterizations: Set[Set[Trip]]
+Usage:
+    from dbscan_seeding import seed_population, serialize_archive
 
-Pipeline:
-  1. Load orders / warehouses / transport_types for one task (polygon).
-  2. external_distance_metric: travel-time estimate between two points for a
-     given transport type. PLACEHOLDER — the task brief explicitly calls for
-     this to be its own service (e.g. a self-hosted OSRM/Valhalla instance,
-     or a vendor routing API). Swap build_distance_matrix's call site to hit
-     that service instead of haversine_m once it exists.
-  3. generalized_distance_metric: external_distance_metric + a penalty for
-     incompatible pickup/deadline windows, so DBSCAN doesn't group orders
-     that are close in space but impossible to serve on a single trip.
-  4. Run DBSCAN per warehouse (a cluster is always scoped to one warehouse)
-     across a grid of (transport, eps, min_samples) to get several distinct
-     base partitions.
-  5. Repair: DBSCAN noise (-1) is illegal in this domain (no unclustered
-     orders allowed) and clusters may violate max_order_count / max_weight.
-     merge_noise() and split_oversized() fix both.
-  6. Assign each repaired cluster a feasible transport_type -> Trip.
-  7. Recombine per-warehouse options into many full Clusterizations
-     (a Clusterization = a Trip set that covers every order exactly once)
-     to hand to the EA as seeded individuals.
+    # Instead of the random for-loop:
+    population = seed_population(orders, warehouses_dict, constraints, population_size=50)
+
+    # After the EA finishes, serialize the archive:
+    serialize_archive(valid_clusterizations_archive, task_id="1", path="output.json")
 """
 
 import json
 import math
-from dataclasses import dataclass
-from datetime import datetime
-from typing import Dict, FrozenSet, List, Tuple
+import random
+from typing import Dict, List, Set, Tuple
 
 import numpy as np
-import pandas as pd
 from sklearn.cluster import DBSCAN, KMeans
 
-
-# ---------------------------------------------------------------------------
-# 1. Data model
-# ---------------------------------------------------------------------------
-
-@dataclass
-class Order:
-    order_id: int
-    warehouse_id: int
-    lat: float
-    lon: float
-    pickup_ready_at: datetime
-    deadline_at: datetime
-    weight_kg: float
-
-
-@dataclass
-class Warehouse:
-    warehouse_id: int
-    lat: float
-    lon: float
-
-
-@dataclass
-class TransportType:
-    code: str
-    speed_kmh: float
-    max_payload_kg: float
-
-
-@dataclass
-class Constraint:
-    max_order_count: int
-    max_weight_kg: float
-
-
-@dataclass
-class Trip:
-    warehouse_id: int
-    transport_type: str
-    order_ids: FrozenSet[int]
-
-
-Clusterization = List[Trip]  # one candidate solution: covers every order exactly once
+from evolutionary_algorithm.domain import Constraint, Individual, Order, Trip
 
 
 # ---------------------------------------------------------------------------
-# 2. Loading
+# Distance metrics  (same logic as evaluation.py, expressed in seconds so
+# eps is directly comparable to time-window gaps)
 # ---------------------------------------------------------------------------
 
-def load_task(task_id: int, data_dir: str = ".") -> Tuple[List[Order], List[Warehouse], List[TransportType]]:
-    orders_df = pd.read_csv(f"{data_dir}/orders.csv")
-    wh_df = pd.read_csv(f"{data_dir}/warehouses.csv")
-    tt_df = pd.read_csv(f"{data_dir}/transport_types.csv")
-
-    orders_df = orders_df[orders_df.task_id == task_id]
-    wh_df = wh_df[wh_df.task_id == task_id]
-
-    orders = [
-        Order(
-            order_id=r.order_id,
-            warehouse_id=r.warehouse_id,
-            lat=r.order_lat,
-            lon=r.order_lon,
-            pickup_ready_at=pd.to_datetime(r.pickup_ready_at),
-            deadline_at=pd.to_datetime(r.delivery_deadline_at),
-            weight_kg=r.total_mass_kg,
-        )
-        for r in orders_df.itertuples()
-    ]
-    warehouses = [Warehouse(r.warehouse_id, r.lat, r.lon) for r in wh_df.itertuples()]
-    transport_types = [TransportType(r.code, r.approx_speed_kmh, r.max_payload_kg) for r in tt_df.itertuples()]
-    return orders, warehouses, transport_types
+ROAD_FACTOR = 1.35  # haversine underestimates real street distance
 
 
-# ---------------------------------------------------------------------------
-# 3. Distance metrics
-# ---------------------------------------------------------------------------
-
-def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    R = 6371000.0
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2 - lat1)
-    dlambda = math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
-    return 2 * R * math.asin(math.sqrt(a))
+def _travel_time_s(lat1: float, lon1: float, lat2: float, lon2: float, speed_kmh: float) -> float:
+    R = 6371.0
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+    dist_km = 2 * R * math.atan2(math.sqrt(a), math.sqrt(1 - a)) * ROAD_FACTOR
+    return (dist_km / speed_kmh) * 3600.0
 
 
-ROAD_FACTOR = 1.35  # straight-line underestimates real street distance; replace with real router output
-
-
-def external_distance_metric(o1: Order, o2: Order, transport: TransportType) -> float:
-    """Estimated travel time in seconds between two points for a transport type.
-    PLACEHOLDER for the real routing service called out in the task brief."""
-    dist_m = haversine_m(o1.lat, o1.lon, o2.lat, o2.lon) * ROAD_FACTOR
-    speed_m_s = transport.speed_kmh * 1000 / 3600
-    return dist_m / speed_m_s
-
-
-def time_window_penalty(o1: Order, o2: Order) -> float:
-    """0 seconds if the two orders' [pickup_ready, deadline] windows overlap;
-    otherwise the size of the gap between them, in seconds."""
+def _time_window_penalty_s(o1: Order, o2: Order) -> float:
+    """0 if windows overlap, otherwise the size of the gap in seconds."""
     latest_start = max(o1.pickup_ready_at, o2.pickup_ready_at)
-    earliest_end = min(o1.deadline_at, o2.deadline_at)
-    gap = (latest_start - earliest_end).total_seconds()
-    return max(0.0, gap)
+    earliest_end = min(o1.delivery_deadline_at, o2.delivery_deadline_at)
+    return max(0.0, (latest_start - earliest_end).total_seconds())
 
 
-TIME_PENALTY_WEIGHT = 0.5  # tune empirically against real route durations
+def _generalized_distance(o1: Order, o2: Order, speed_kmh: float, tw_weight: float = 0.5) -> float:
+    travel = _travel_time_s(o1.lat, o1.lon, o2.lat, o2.lon, speed_kmh)
+    penalty = _time_window_penalty_s(o1, o2)
+    return travel + tw_weight * penalty
 
 
-def generalized_distance_metric(o1: Order, o2: Order, transport: TransportType) -> float:
-    return external_distance_metric(o1, o2, transport) + TIME_PENALTY_WEIGHT * time_window_penalty(o1, o2)
-
-
-def build_distance_matrix(orders: List[Order], transport: TransportType) -> np.ndarray:
+def _distance_matrix(orders: List[Order], speed_kmh: float) -> np.ndarray:
     n = len(orders)
     mat = np.zeros((n, n))
     for i in range(n):
         for j in range(i + 1, n):
-            d = generalized_distance_metric(orders[i], orders[j], transport)
+            d = _generalized_distance(orders[i], orders[j], speed_kmh)
             mat[i, j] = mat[j, i] = d
     return mat
 
 
 # ---------------------------------------------------------------------------
-# 4. DBSCAN per warehouse
+# DBSCAN + repair
 # ---------------------------------------------------------------------------
 
-def dbscan_partition(orders: List[Order], transport: TransportType, eps: float, min_samples: int) -> Dict[int, List[int]]:
-    """{cluster_label: [order_index, ...]}; label -1 is DBSCAN noise."""
+def _eps_candidates(orders: List[Order], speed_kmh: float) -> List[float]:
+    """Eps values from the empirical distance distribution — no magic constants."""
+    if len(orders) < 2:
+        return [60.0]
+    mat = _distance_matrix(orders, speed_kmh)
+    upper = mat[np.triu_indices_from(mat, k=1)]
+    return [float(p) for p in np.percentile(upper, [20, 40, 60, 80]) if p > 0]
+
+
+def _run_dbscan(orders: List[Order], speed_kmh: float, eps: float, min_samples: int) -> Dict[int, List[int]]:
     if len(orders) == 1:
         return {0: [0]}
-    dmat = build_distance_matrix(orders, transport)
-    labels = DBSCAN(eps=eps, min_samples=min_samples, metric="precomputed").fit_predict(dmat)
+    labels = DBSCAN(eps=eps, min_samples=min_samples, metric="precomputed").fit_predict(
+        _distance_matrix(orders, speed_kmh)
+    )
     clusters: Dict[int, List[int]] = {}
     for idx, lab in enumerate(labels):
         clusters.setdefault(int(lab), []).append(idx)
     return clusters
 
 
-def eps_grid(orders: List[Order], transport: TransportType, n: int = 4) -> List[float]:
-    """Eps candidates taken from the empirical distance distribution instead
-    of a blind guess — robust across very different warehouse densities."""
-    if len(orders) < 2:
-        return [1.0]
-    dmat = build_distance_matrix(orders, transport)
-    upper = dmat[np.triu_indices_from(dmat, k=1)]
-    pct = np.percentile(upper, [20, 40, 60, 80][:n])
-    return sorted(set(float(p) for p in pct if p > 0))
-
-
-# ---------------------------------------------------------------------------
-# 5. Repair: zero noise, respect constraints
-# ---------------------------------------------------------------------------
-
-def cluster_weight(orders: List[Order], idxs: List[int]) -> float:
-    return sum(orders[i].weight_kg for i in idxs)
-
-
-def merge_noise(
-        orders: List[Order], transport: TransportType, clusters: Dict[int, List[int]], constraint: Constraint
-) -> Dict[int, List[int]]:
-    """Every order must end up in some cluster. Fold DBSCAN noise into the
-    nearest real cluster if it still respects the constraints; otherwise the
-    order becomes its own singleton cluster (never dropped)."""
+def _merge_noise(orders: List[Order], speed_kmh: float, clusters: Dict[int, List[int]], constraint: Constraint, transport_type: str) -> Dict[int, List[int]]:
     if -1 not in clusters:
         return clusters
     noise = clusters.pop(-1)
     next_label = max(clusters.keys(), default=-1) + 1
+    max_weight = constraint.max_weight_per_transport[transport_type]
     for idx in noise:
         best_label, best_d = None, math.inf
         for lab, members in clusters.items():
             if len(members) + 1 > constraint.max_order_count:
                 continue
-            if cluster_weight(orders, members) + orders[idx].weight_kg > constraint.max_weight_kg:
+            w = sum(orders[m].total_mass_kg for m in members) + orders[idx].total_mass_kg
+            if w > max_weight:
                 continue
-            d = min(generalized_distance_metric(orders[idx], orders[m], transport) for m in members)
+            d = min(_generalized_distance(orders[idx], orders[m], speed_kmh) for m in members)
             if d < best_d:
                 best_d, best_label = d, lab
         if best_label is not None:
@@ -227,18 +114,15 @@ def merge_noise(
     return clusters
 
 
-def split_oversized(
-        orders: List[Order], clusters: Dict[int, List[int]], constraint: Constraint
-) -> Dict[int, List[int]]:
-    """Recursively bisect (by lat/lon KMeans) any cluster that breaks
-    max_order_count or max_weight."""
+def _split_oversized(orders: List[Order], clusters: Dict[int, List[int]], constraint: Constraint, transport_type: str) -> Dict[int, List[int]]:
+    max_weight = constraint.max_weight_per_transport[transport_type]
     result: Dict[int, List[int]] = {}
     next_label = 0
     stack = list(clusters.values())
     while stack:
         members = stack.pop()
         too_many = len(members) > constraint.max_order_count
-        too_heavy = cluster_weight(orders, members) > constraint.max_weight_kg
+        too_heavy = sum(orders[i].total_mass_kg for i in members) > max_weight
         if (too_many or too_heavy) and len(members) > 1:
             coords = np.array([[orders[i].lat, orders[i].lon] for i in members])
             km = KMeans(n_clusters=2, n_init=4, random_state=0).fit(coords)
@@ -252,161 +136,145 @@ def split_oversized(
 
 
 # ---------------------------------------------------------------------------
-# 6. Transport-type assignment -> Trips
+# Build one Individual from a DBSCAN partition of all warehouses
 # ---------------------------------------------------------------------------
 
-def feasible_transports(
-        orders: List[Order], idxs: List[int], transport_types: List[TransportType], constraint: Constraint
-) -> List[TransportType]:
-    w = cluster_weight(orders, idxs)
-    return [t for t in transport_types if w <= t.max_payload_kg and len(idxs) <= constraint.max_order_count]
-
-
-def clusters_to_trips(
+def _build_individual(
         orders: List[Order],
-        warehouse_id: int,
-        clusters: Dict[int, List[int]],
-        transport_types: List[TransportType],
-        constraint: Constraint,
-        rng: np.random.Generator,
-) -> List[Trip]:
-    trips = []
-    for members in clusters.values():
-        choices = feasible_transports(orders, members, transport_types, constraint)
-        if not choices:
-            # No single transport type can take the whole cluster: fall back
-            # to singletons on the smallest-payload vehicle rather than
-            # silently dropping orders.
-            fallback = min(transport_types, key=lambda tt: tt.max_payload_kg)
-            for m in members:
-                trips.append(Trip(warehouse_id, fallback.code, frozenset([orders[m].order_id])))
-            continue
-        t = choices[rng.integers(len(choices))]
-        trips.append(Trip(warehouse_id, t.code, frozenset(orders[m].order_id for m in members)))
-    return trips
-
-
-# ---------------------------------------------------------------------------
-# 7. Assemble many DBSCAN-seeded individuals for the EA
-# ---------------------------------------------------------------------------
-
-def seed_population(
-        orders: List[Order],
-        transport_types: List[TransportType],
-        constraint: Constraint,
-        n_individuals: int = 2000,
-        seed: int = 0,
-) -> List[Clusterization]:
-    rng = np.random.default_rng(seed)
+        warehouses_dict: Dict[int, Tuple[float, float]],
+        constraints: Constraint,
+        speed_kmh: float,
+        transport_type: str,
+        eps: float,
+        min_samples: int,
+        trip_counter_start: int = 1,
+) -> Individual:
+    ind = Individual()
+    trip_counter = trip_counter_start
     by_wh: Dict[int, List[Order]] = {}
     for o in orders:
         by_wh.setdefault(o.warehouse_id, []).append(o)
 
-    # Per warehouse, precompute several repaired DBSCAN partitions across a
-    # grid of (transport, eps, min_samples). Using each transport's own speed
-    # as the metric's time scale (not just one reference vehicle) is what
-    # gives genuinely different — not just noisy — partitions.
-    per_wh_options: Dict[int, List[Dict[int, List[int]]]] = {}
     for wh_id, wh_orders in by_wh.items():
-        options = []
-        for transport in transport_types:
-            for eps in eps_grid(wh_orders, transport):
-                for min_samples in (1, 2, 3):
-                    raw = dbscan_partition(wh_orders, transport, eps, min_samples)
-                    repaired = merge_noise(wh_orders, transport, dict(raw), constraint)
-                    repaired = split_oversized(wh_orders, repaired, constraint)
-                    options.append(repaired)
-        per_wh_options[wh_id] = options
+        raw = _run_dbscan(wh_orders, speed_kmh, eps, min_samples)
+        repaired = _merge_noise(wh_orders, speed_kmh, dict(raw), constraints, transport_type)
+        repaired = _split_oversized(wh_orders, repaired, constraints, transport_type)
 
-    wh_ids = list(by_wh.keys())
-    population: List[Clusterization] = []
-    seen_signatures = set()
-    attempts = 0
-    while len(population) < n_individuals and attempts < n_individuals * 30:
-        attempts += 1
-        individual: Clusterization = []
-        for wh_id in wh_ids:
-            opts = per_wh_options[wh_id]
-            clusters = opts[rng.integers(len(opts))]
-            trips = clusters_to_trips(by_wh[wh_id], wh_id, clusters, transport_types, constraint, rng)
-            individual.extend(trips)
-        signature = frozenset((t.warehouse_id, t.transport_type, t.order_ids) for t in individual)
-        if signature in seen_signatures:
-            continue  # keep the population free of exact duplicates
-        seen_signatures.add(signature)
-        population.append(individual)
-    return population
+        for members in repaired.values():
+            ind.trips[trip_counter] = Trip(
+                trip_id=trip_counter,
+                warehouse_id=wh_id,
+                transport_type=transport_type,
+                order_ids=[wh_orders[m].order_id for m in members],
+            )
+            trip_counter += 1
 
-
-def validate_clusterization(individual: Clusterization, orders: List[Order]) -> None:
-    """Sanity check matching the brief: every order in exactly one trip, no noise."""
-    seen = []
-    for trip in individual:
-        seen.extend(trip.order_ids)
-    expected = sorted(o.order_id for o in orders)
-    assert sorted(seen) == expected, f"coverage mismatch: {sorted(seen)} vs {expected}"
+    return ind
 
 
 # ---------------------------------------------------------------------------
-# 8. JSON export
+# Public API
 # ---------------------------------------------------------------------------
 
-def trip_to_json(trip: Trip) -> List[int]:
-    """A trip is just its order_ids, as a plain array — warehouse_id and
-    transport_type still live on the Trip object internally, they're just
-    not part of this strict output format."""
-    return sorted(trip.order_ids)
+def seed_population(
+        orders: List[Order],
+        warehouses_dict: Dict[int, Tuple[float, float]],
+        constraints: Constraint,
+        population_size: int = 50,
+        seed: int = 0,
+) -> List[Individual]:
+    """
+    Produces `population_size` DBSCAN-seeded Individual objects.
+    Drop-in for the random init loop in run_evolutionary_clustering().
+    """
+    rng = np.random.default_rng(seed)
+
+    # Build a grid of (transport_type, eps, min_samples) candidates
+    candidates: List[Individual] = []
+    seen_sigs: Set[frozenset] = set()
+
+    transport_types = list(constraints.transport_distribution.keys())
+    speeds = constraints.speeds_kmh
+
+    for transport_type in transport_types:
+        # Sample eps from data distribution for each transport's speed
+        by_wh: Dict[int, List[Order]] = {}
+        for o in orders:
+            by_wh.setdefault(o.warehouse_id, []).append(o)
+        all_eps: List[float] = []
+        for wh_orders in by_wh.values():
+            all_eps.extend(_eps_candidates(wh_orders, speeds[transport_type]))
+        if not all_eps:
+            continue
+
+        for eps in all_eps:
+            for min_samples in (1, 2, 3):
+                ind = _build_individual(
+                    orders, warehouses_dict, constraints,
+                    speed_kmh=speeds[transport_type],
+                    transport_type=transport_type,
+                    eps=eps,
+                    min_samples=min_samples,
+                )
+                sig = ind.get_trip_sets()
+                if sig not in seen_sigs:
+                    seen_sigs.add(sig)
+                    candidates.append(ind)
+
+    # If we got more candidates than needed, sample by transport_distribution weighting
+    # so the seeded population reflects the real fleet mix.
+    if len(candidates) >= population_size:
+        chosen = list(rng.choice(len(candidates), size=population_size, replace=False))
+        return [candidates[i] for i in chosen]
+
+    # If we have fewer unique DBSCAN variants than population_size, pad with
+    # random-chunked individuals (same logic as the original EA init) to
+    # reach the target size without duplicating seed individuals.
+    population = list(candidates)
+    while len(population) < population_size:
+        ind = Individual()
+        trip_counter = 1
+        for wh_id in set(o.warehouse_id for o in orders):
+            wh_orders = [o for o in orders if o.warehouse_id == wh_id]
+            random.shuffle(wh_orders)
+            chunk_size = constraints.max_order_count
+            for i in range(0, len(wh_orders), chunk_size):
+                chunk = wh_orders[i:i + chunk_size]
+                t_type = random.choices(
+                    list(constraints.transport_distribution.keys()),
+                    weights=list(constraints.transport_distribution.values()),
+                )[0]
+                ind.trips[trip_counter] = Trip(
+                    trip_id=trip_counter,
+                    warehouse_id=wh_id,
+                    transport_type=t_type,
+                    order_ids=[o.order_id for o in chunk],
+                )
+                trip_counter += 1
+        sig = ind.get_trip_sets()
+        if sig not in seen_sigs:
+            seen_sigs.add(sig)
+            population.append(ind)
+
+    return population[:population_size]
 
 
-def clusterization_to_json(individual: Clusterization) -> List[List[int]]:
-    """One candidate solution -> a list of order_id arrays, one per trip."""
-    return [trip_to_json(t) for t in individual]
+def serialize_archive(
+        archive: Set[frozenset],
+        task_id: str,
+        path: str,
+        existing: Dict = None,
+) -> None:
+    """
+    Serializes valid_clusterizations_archive to the strict JSON format:
+        {"task_1": [[order_ids], [order_ids], ...], ...}
 
-
-def population_to_json(task_id: int, population: List[Clusterization]) -> Dict[str, List[List[List[int]]]]:
-    """{"task_<id>": [clusterization, clusterization, ...]}."""
-    return {f"task_{task_id}": [clusterization_to_json(ind) for ind in population]}
-
-
-def write_population_json(task_id: int, population: List[Clusterization], path: str) -> None:
+    Pass `existing` to append to a multi-task JSON file without overwriting other tasks.
+    """
+    data = existing or {}
+    data[f"task_{task_id}"] = [
+        [sorted(trip_set) for trip_set in clusterization]
+        for clusterization in archive
+    ]
     with open(path, "w") as f:
-        json.dump(population_to_json(task_id, population), f, indent=2)
-
-
-def write_multi_task_json(populations_by_task: Dict[int, List[Clusterization]], path: str) -> None:
-    """{"task_1": [...], "task_2": [...], ...} all in one file."""
-    combined: Dict[str, List[List[List[int]]]] = {}
-    for task_id, population in populations_by_task.items():
-        combined.update(population_to_json(task_id, population))
-    with open(path, "w") as f:
-        json.dump(combined, f, indent=2)
-
-
-# ---------------------------------------------------------------------------
-# Demo
-# ---------------------------------------------------------------------------
-
-if __name__ == "__main__":
-    DATA_DIR = "data"
-
-    populations_by_task: Dict[int, List[Clusterization]] = {}
-    for task_id in (1, 2, 3):
-        orders, warehouses, transport_types = load_task(task_id, DATA_DIR)
-
-        constraint = Constraint(
-            max_order_count=5,                                       # placeholder: plug in real Constraint values
-            max_weight_kg=max(t.max_payload_kg for t in transport_types),
-        )
-
-        population = seed_population(orders, transport_types, constraint, n_individuals=2000, seed=42)
-
-        for ind in population[:3]:
-            validate_clusterization(ind, orders)
-
-        print(f"task_{task_id}: {len(orders)} orders, {len(warehouses)} warehouses -> {len(population)} distinct seeded individuals")
-        populations_by_task[task_id] = population
-
-    out_path = "seed_population.json"
-    write_multi_task_json(populations_by_task, out_path)
-    print(f"\nWrote {out_path}")
-    print(f"Keys: {list(json.load(open(out_path)).keys())}")
+        json.dump(data, f, indent=2)

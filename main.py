@@ -1,10 +1,19 @@
 import json
 from evolutionary_algorithm.parser import load_all_orders, load_all_warehouses, load_transport_constraints
-from evolutionary_algorithm.domain import Constraint
-from evolutionary_algorithm.algorithm import run_evolutionary_clustering
-
+from evolutionary_algorithm.domain import Constraint, Algorithms
+from evolutionary_algorithm.algorithm import run_evolutionary_clustering, Algorithms
+import argparse
 
 def main():
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "algorithm",
+        type=lambda a: Algorithms[a.upper()],  # Maps string to Enum member (case-insensitive)
+        choices=list(Algorithms),            # Restricts CLI choices to the Enum members
+        help="Choose an algorithm to start with"
+    )
+    args = parser.parse_args()
     print("Loading comprehensive datasets...")
 
     # 1. Load data automatically grouped by task_id
@@ -36,6 +45,7 @@ def main():
 
         # 3. Run the evolutionary algorithm
         valid_clusters = run_evolutionary_clustering(
+            algorithm=args.algorithm,
             orders=isolated_orders,
             warehouses_dict=isolated_warehouses,
             constraints=constraints,

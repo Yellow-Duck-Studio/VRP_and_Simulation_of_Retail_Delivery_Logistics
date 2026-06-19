@@ -5,6 +5,9 @@ import random
 
 from evolutionary_algorithm.evaluation import evaluate_fitness
 
+# Algorithms
+from evolutionary_algorithm.domain import Algorithms
+from dbscan import seed_population
 
 def _copy_individual(individual: Individual) -> Individual:
     return Individual(trips={
@@ -156,8 +159,8 @@ def crossover(parent1: Individual, parent2: Individual) -> Individual:
 
     return child
 
-
 def run_evolutionary_clustering(
+        algorithm: Algorithms,
         orders: List[Order],
         warehouses_dict: Dict[int, Tuple[float, float]],  # warehouse_id -> (lat, lon)
         constraints: Constraint,
@@ -166,38 +169,41 @@ def run_evolutionary_clustering(
 ) -> Set[frozenset]:
     orders_dict = {o.order_id: o for o in orders}
     valid_clusterizations_archive: Set[frozenset] = set()
-    population: List[Individual] = []
+    # 1. Initializing population based on chosen algorithm
 
-    # 1. Initialize random population (In production, use nearest-neighbor seeding)
-    for _ in range(population_size):
-        ind = Individual()
-        trip_counter = 1
-        # Group strictly by warehouse
-        for wh_id in set(o.warehouse_id for o in orders):
-            wh_orders = [o for o in orders if o.warehouse_id == wh_id]
-            random.shuffle(wh_orders)
+    if algorithm == Algorithms.DBSCAN:
+        population = seed_population(orders, warehouses_dict, constraints, population_size=50)
+    if algorithm == Algorithms.RND:
+        population: List[Individual] = []
+        for _ in range(population_size):
+            ind = Individual()
+            trip_counter = 1
+            # Group strictly by warehouse
+            for wh_id in set(o.warehouse_id for o in orders):
+                wh_orders = [o for o in orders if o.warehouse_id == wh_id]
+                random.shuffle(wh_orders)
 
-            # Chunk orders into initial trips
-            chunk_size = constraints.max_order_count
-            for i in range(0, len(wh_orders), chunk_size):
-                chunk = wh_orders[i:i + chunk_size]
-                trans_type = random.choices(
-                    list(constraints.transport_distribution.keys()),
-                    weights=list(constraints.transport_distribution.values())
-                )[0]
+                # Chunk orders into initial trips
+                chunk_size = constraints.max_order_count
+                for i in range(0, len(wh_orders), chunk_size):
+                    chunk = wh_orders[i:i + chunk_size]
+                    trans_type = random.choices(
+                        list(constraints.transport_distribution.keys()),
+                        weights=list(constraints.transport_distribution.values())
+                    )[0]
 
-                ind.trips[trip_counter] = Trip(
-                    trip_id=trip_counter,
-                    warehouse_id=wh_id,
-                    transport_type=trans_type,
-                    order_ids=[o.order_id for o in chunk]
-                )
-                trip_counter += 1
+                    ind.trips[trip_counter] = Trip(
+                        trip_id=trip_counter,
+                        warehouse_id=wh_id,
+                        transport_type=trans_type,
+                        order_ids=[o.order_id for o in chunk]
+                    )
+                    trip_counter += 1
 
-        evaluate_fitness(ind, orders_dict, constraints, warehouses_dict)
-        population.append(ind)
+            evaluate_fitness(ind, orders_dict, constraints, warehouses_dict)
+            population.append(ind)
 
-    # 2. Main Evolutionary Loop
+# 2. Main Evolutionary Loop
     for gen in range(generations):
         # Sort by fitness (lowest is best)
         population.sort(key=lambda x: x.fitness_score)
