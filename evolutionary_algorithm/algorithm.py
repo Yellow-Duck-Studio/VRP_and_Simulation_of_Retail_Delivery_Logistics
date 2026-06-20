@@ -9,6 +9,8 @@ from evolutionary_algorithm.evaluation import evaluate_fitness
 from evolutionary_algorithm.domain import Algorithms
 from dbscan import seed_population
 
+from evolutionary_algorithm.evaluation import haversine_distance, evaluate_cluster_direction
+
 def _copy_individual(individual: Individual) -> Individual:
     return Individual(trips={
         k: Trip(
@@ -117,16 +119,116 @@ def _mutate_split(ind: Individual) -> None:
             order_ids=cluster_orders,
         )
 
+def _mutate_destroy_repair(
+        ind: Individual,
+        orders_dict: Dict[int, Order],
+        warehouses: Dict[int, Tuple[float, float]],
+        constraints: Constraint
+) -> None:
+    """Removes the 'weakest' orders from clusters and greedily re-inserts them."""
+    active_trips = [t for t in _active_trips(ind) if len(t.order_ids) > 1]
+    if not active_trips:
+        return
 
-def mutate(individual: Individual, all_orders: List[Order]) -> Individual:
-    """Apply one random mutation: swap, detach, merge, or split."""
+    orphaned_orders: List[Tuple[int, int]] = []  # (order_id, warehouse_id)
+
+    # --- 1. DESTROY PHASE (Worst Removal) ---
+    # Pick a few random trips to ruin (e.g., 1 to 3 trips)
+    num_to_destroy = random.randint(1, min(3, len(active_trips)))
+    target_trips = random.sample(active_trips, num_to_destroy)
+
+    for trip in target_trips:
+        wh_lat, wh_lon = warehouses[trip.warehouse_id]
+        worst_order_id = None
+        max_dist = -1.0
+
+        # Define "weakest" as the order furthest from the warehouse
+        # (Alternatively, you could evaluate directional penalty drop)
+        for oid in trip.order_ids:
+            order = orders_dict[oid]
+            dist = haversine_distance(wh_lat, wh_lon, order.lat, order.lon)
+            if dist > max_dist:
+                max_dist = dist
+                worst_order_id = oid
+
+        if worst_order_id:
+            trip.order_ids.remove(worst_order_id)
+            orphaned_orders.append((worst_order_id, trip.warehouse_id))
+
+    # --- 2. REPAIR PHASE (Greedy Insertion) ---
+    for order_id, wh_id in orphaned_orders:
+        order = orders_dict[order_id]
+        best_trip = None
+        best_cost_increase = float('inf')
+
+        # Find all active trips for this warehouse
+        candidate_trips = [t for t in _active_trips(ind) if t.warehouse_id == wh_id]
+
+        for trip in candidate_trips:
+            # Hard Constraint 1: Order count
+            if len(trip.order_ids) >= constraints.max_order_count:
+                continue
+
+            # Hard Constraint 2: Weight capacity
+            current_weight = sum(orders_dict[oid].total_mass_kg for oid in trip.order_ids)
+            if current_weight + order.total_mass_kg > constraints.max_weight_per_transport[trip.transport_type]:
+                continue
+
+            # Heuristic Cost: How much does inserting this ruin the directional cohesion?
+            trip_orders = [orders_dict[oid] for oid in trip.order_ids] + [order]
+            wh_lat, wh_lon = warehouses[wh_id]
+
+            cost = evaluate_cluster_direction(wh_lat, wh_lon, trip_orders)
+
+            if cost < best_cost_increase:
+                best_cost_increase = cost
+                best_trip = trip
+
+        # Resolve: Insert into the best found trip, or create a new one
+        if best_trip:
+            best_trip.order_ids.append(order_id)
+        else:
+            new_trip_id = _next_trip_id(ind.trips)
+            # Pick a valid transport type based on your distribution
+            trans_type = random.choices(
+                list(constraints.transport_distribution.keys()),
+                weights=list(constraints.transport_distribution.values())
+            )[0]
+
+            ind.trips[new_trip_id] = Trip(
+                trip_id=new_trip_id,
+                warehouse_id=wh_id,
+                transport_type=trans_type,
+                order_ids=[order_id]
+            )
+
+
+def mutate(
+        individual: Individual,
+        orders_dict: Dict[int, Order],
+        warehouses_dict: Dict[int, Tuple[float, float]],
+        constraints: Constraint
+) -> Individual:
+    """Apply one random mutation."""
     new_ind = _copy_individual(individual)
-    random.choice([
-        _mutate_swap,
-        _mutate_detach,
-        _mutate_merge,
-        _mutate_split,
-    ])(new_ind)
+
+    # Give the intelligent LNS operator a good chance of being selected
+    mutation_type = random.choices(
+        ['swap', 'detach', 'merge', 'split', 'destroy_repair'],
+        weights=[0.2, 0.15, 0.15, 0.1, 0.4]  # 40% chance for Destroy & Repair
+    )[0]
+
+    if mutation_type == 'swap':
+        _mutate_swap(new_ind)
+    elif mutation_type == 'detach':
+        _mutate_detach(new_ind)
+    elif mutation_type == 'merge':
+        _mutate_merge(new_ind)
+    elif mutation_type == 'split':
+        _mutate_split(new_ind)
+    elif mutation_type == 'destroy_repair':
+        _mutate_destroy_repair(new_ind, orders_dict, warehouses_dict, constraints)
+
     return new_ind
 
 
@@ -223,7 +325,7 @@ def run_evolutionary_clustering(
             child = crossover(p1, p2)
 
             if random.random() < 0.5:  # 50% mutation rate
-                child = mutate(child, orders)
+                child = mutate(child, orders_dict, warehouses_dict, constraints)
 
             evaluate_fitness(child, orders_dict, constraints, warehouses_dict)
             next_population.append(child)

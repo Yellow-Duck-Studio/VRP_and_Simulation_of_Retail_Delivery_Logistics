@@ -1,5 +1,5 @@
 import math
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Dict, List, Tuple
 from evolutionary_algorithm.domain import Individual, Order, Constraint
 
