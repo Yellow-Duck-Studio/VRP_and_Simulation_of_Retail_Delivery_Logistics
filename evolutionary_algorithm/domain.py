@@ -7,6 +7,7 @@ class Algorithms(Enum):
     DBSCAN = "DBSCAN",
     SWEEP = "SWEEP",
     CLWR = "CLWR",
+    DSTR = "DSTR"
     RND = "RD"
 #
 @dataclass(frozen=True)
