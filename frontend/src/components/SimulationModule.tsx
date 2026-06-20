@@ -38,13 +38,15 @@ export default function SimulationModule() {
         </button>
       </div>
 
-      {output ? (
-        <pre className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm font-mono text-gray-800 whitespace-pre-wrap max-h-96 overflow-auto">
-          {output}
-        </pre>
-      ) : (
-        <p className="text-sm text-gray-400 italic">Press Run to start simulation.</p>
-      )}
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-96 overflow-auto min-h-[120px]">
+        {output ? (
+          <pre className="text-sm font-mono text-gray-800 whitespace-pre-wrap">
+            {output}
+          </pre>
+        ) : (
+          <p className="text-sm text-gray-400 italic m-0">Press Run to start simulation.</p>
+        )}
+      </div>
     </div>
   );
 }

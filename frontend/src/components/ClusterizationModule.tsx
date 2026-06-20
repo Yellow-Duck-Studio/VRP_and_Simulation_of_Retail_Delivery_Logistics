@@ -60,6 +60,8 @@ export default function ClusterizationModule() {
     setVariantIdx((prev) => ({ ...prev, [alg]: clamped }));
   };
 
+  const hasResultsToDisplay = selectedAlgo.some((alg) => results[alg]);
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
       <div className="flex items-center justify-between mb-4">
@@ -123,64 +125,71 @@ export default function ClusterizationModule() {
         </div>
 
         <div className="flex-1 space-y-6">
-          {selectedAlgo.length === 0 && (
-            <p className="text-sm text-gray-400 italic">Select at least one algorithm and press Run.</p>
-          )}
-
-          {selectedAlgo.map((alg) => {
-            const tasks = getTasks(alg);
-            if (tasks.length === 0) return null;
-            const selectedTaskIdx = polygonIdx[alg] ?? 0;
-            const selectedTaskKey = tasks[selectedTaskIdx] || tasks[0];
-            const variants = getVariants(alg, selectedTaskKey);
-            const selectedVarIdx = variantIdx[alg] ?? 0;
-            const selectedVariantClusters = variants[selectedVarIdx] || [];
-
-            return (
-              <div key={alg} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-4">
-                    {/* Polygon */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-gray-500">Polygon</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={tasks.length}
-                        value={selectedTaskIdx + 1}
-                        onChange={(e) =>
-                          handlePolygonChange(alg, parseInt(e.target.value) || 1, tasks.length)
-                        }
-                        className="w-16 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1"
-                      />
-                      <span className="text-xs text-gray-400">/ {tasks.length}</span>
-                    </div>
-
-                    {/* Variant */}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-gray-500">Variant</span>
-                      <input
-                        type="number"
-                        min={1}
-                        max={variants.length}
-                        value={selectedVarIdx + 1}
-                        onChange={(e) =>
-                          handleVariantChange(alg, parseInt(e.target.value) || 1, variants.length)
-                        }
-                        className="w-16 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1"
-                      />
-                      <span className="text-xs text-gray-400">/ {variants.length}</span>
-                    </div>
-                  </div>
-                  <div className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded">
-                    {alg}
-                  </div>
-                </div>
-
-                <ClusterMapCanvas clusters={selectedVariantClusters} width={700} height={500} />
+          {!hasResultsToDisplay ? (
+            <div className="border border-gray-200 rounded-lg p-4">
+              <div className="mb-3 text-sm text-gray-500 flex justify-between items-center">
+                <span>
+                  {selectedAlgo.length === 0
+                    ? "Select at least one algorithm and press Run."
+                    : "Press Run to execute selected algorithms."}
+                </span>
               </div>
-            );
-          })}
+              <ClusterMapCanvas clusters={[]} />
+            </div>
+          ) : (
+            selectedAlgo.map((alg) => {
+              const tasks = getTasks(alg);
+              if (tasks.length === 0) return null;
+              const selectedTaskIdx = polygonIdx[alg] ?? 0;
+              const selectedTaskKey = tasks[selectedTaskIdx] || tasks[0];
+              const variants = getVariants(alg, selectedTaskKey);
+              const selectedVarIdx = variantIdx[alg] ?? 0;
+              const selectedVariantClusters = variants[selectedVarIdx] || [];
+
+              return (
+                <div key={alg} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-500">Polygon</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={tasks.length}
+                          value={selectedTaskIdx + 1}
+                          onChange={(e) =>
+                            handlePolygonChange(alg, parseInt(e.target.value) || 1, tasks.length)
+                          }
+                          className="w-16 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1"
+                        />
+                        <span className="text-xs text-gray-400">/ {tasks.length}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-gray-500">Variant</span>
+                        <input
+                          type="number"
+                          min={1}
+                          max={variants.length}
+                          value={selectedVarIdx + 1}
+                          onChange={(e) =>
+                            handleVariantChange(alg, parseInt(e.target.value) || 1, variants.length)
+                          }
+                          className="w-16 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1"
+                        />
+                        <span className="text-xs text-gray-400">/ {variants.length}</span>
+                      </div>
+                    </div>
+                    <div className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                      {alg}
+                    </div>
+                  </div>
+
+                  <ClusterMapCanvas clusters={selectedVariantClusters} />
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>

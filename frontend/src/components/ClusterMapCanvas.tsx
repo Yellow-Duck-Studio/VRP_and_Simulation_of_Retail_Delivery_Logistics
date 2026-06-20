@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useRef, useId } from "react";
+import { useState, useMemo, useCallback, useRef, useId, useEffect } from "react";
 import { mockOrders, type OrderInfo } from "../mockData";
 
 interface ClusterMapProps {
@@ -54,11 +54,19 @@ function shortenLine(
 }
 
 export default function ClusterMap({ clusters }: ClusterMapProps) {
+  const [virtualDistance, setVirtualDistance] = useState(0);
   const [hoveredPoint, setHoveredPoint] = useState<Point | null>(null);
   const [tooltipOrder, setTooltipOrder] = useState<OrderInfo | null>(null);
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
   const containerRef = useRef<HTMLDivElement>(null);
   const arrowId = useId();
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setVirtualDistance(prev => prev + Math.floor(Math.random() * 5) + 2);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const points: Point[] = useMemo(() => {
     const result: Point[] = [];
@@ -108,6 +116,87 @@ export default function ClusterMap({ clusters }: ClusterMapProps) {
     setHoveredPoint(null);
     setTooltipOrder(null);
   }, []);
+
+  if (!clusters || clusters.length === 0) {
+    const idlePath = "M 150,300 L 250,150 L 450,150 L 550,300 L 450,450 L 250,450 Z";
+
+    const idleCars = [
+      { fill: "#3b82f6", begin: "0s" },
+      { fill: "#f59e0b", begin: "-4s" },
+      { fill: "#ea74e8", begin: "-8s" },
+    ];
+
+    return (
+      <div className="relative w-full overflow-hidden border border-gray-200 rounded-lg bg-slate-50 flex items-center justify-center">
+        <svg
+          viewBox={`0 0 ${VIEW_BOX_WIDTH} ${VIEW_BOX_HEIGHT}`}
+          className="w-full h-auto"
+          preserveAspectRatio="xMidYMid meet"
+          style={{ maxHeight: "600px" }}
+        >
+
+          <path
+            d={idlePath}
+            fill="none"
+            stroke="#cbd5e1"
+            strokeWidth="2"
+          />
+
+          <circle cx="150" cy="300" r="9" fill="#94a3b8" />
+          <text x="150" y="300" textAnchor="middle" dominantBaseline="middle" fill="#f8fafc" fontSize="12" fontWeight="bold">
+            5
+          </text>
+
+          <circle cx="250" cy="150" r="9" fill="#94a3b8" />
+          <text x="250" y="150" textAnchor="middle" dominantBaseline="middle" fill="#f8fafc" fontSize="12" fontWeight="bold">
+            9
+          </text>
+          <circle cx="450" cy="150" r="9" fill="#94a3b8" />
+          <text x="450" y="150" textAnchor="middle" dominantBaseline="middle" fill="#f8fafc" fontSize="12" fontWeight="bold">
+            3
+          </text>
+          <circle cx="550" cy="300" r="9" fill="#94a3b8" />
+          <text x="550" y="300" textAnchor="middle" dominantBaseline="middle" fill="#f8fafc" fontSize="12" fontWeight="bold">
+            2
+          </text>
+          <circle cx="450" cy="450" r="9" fill="#94a3b8" />
+          <text x="450" y="450" textAnchor="middle" dominantBaseline="middle" fill="#f8fafc" fontSize="12" fontWeight="bold">
+            7
+          </text>
+          <circle cx="250" cy="450" r="9" fill="#94a3b8" />
+          <text x="250" y="450" textAnchor="middle" dominantBaseline="middle" fill="#f8fafc" fontSize="12" fontWeight="bold">
+            1
+          </text>
+
+          {idleCars.map((car, index) => (
+            <g key={index}>
+              {/* Body */}
+              <rect x="-12" y="-7" width="24" height="14" rx="3" fill={car.fill} stroke="#ffffff" strokeWidth="1.5" />
+              {/* Windshield */}
+              <rect x="1" y="-5" width="5" height="10" rx="1" fill="#1e293b" opacity="0.5" />
+              {/* Rear window */}
+              <rect x="-8" y="-5" width="3" height="10" rx="1" fill="#1e293b" opacity="0.5" />
+              {/* Lights */}
+              <rect x="10" y="-5" width="2" height="3" fill="#fef08a" />
+              <rect x="10" y="2" width="2" height="3" fill="#fef08a" />
+
+              <animateMotion
+                dur="12s"
+                begin={car.begin}
+                repeatCount="indefinite"
+                path={idlePath}
+                rotate="auto"
+              />
+            </g>
+          ))}
+
+          <text x={VIEW_BOX_WIDTH / 2} y={VIEW_BOX_HEIGHT / 2} textAnchor="middle" fill="#475569" fontSize="28" fontWeight="bold">
+            Idle Fleet Mileage: {virtualDistance} km
+          </text>
+        </svg>
+      </div>
+    );
+  }
 
   return (
     <div
