@@ -2,6 +2,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import List, Dict, Set, Tuple, Optional
 
+from enum import Enum
+class Algorithms(Enum):
+    DBSCAN = "DBSCAN",
+    SWEEP = "SWEEP",
+    CLWR = "CLWR",
+    DSTR = "DSTR"
+    RND = "RD"
+#
 @dataclass(frozen=True)
 class Order:
     order_id: int
