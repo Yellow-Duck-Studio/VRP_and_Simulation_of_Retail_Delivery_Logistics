@@ -8,6 +8,8 @@ from evolutionary_algorithm.evaluation import evaluate_fitness
 # Algorithms
 from evolutionary_algorithm.domain import Algorithms
 from dbscan import seed_population
+from heuristics.savings_core import build_clarke_wright_solution
+from heuristics.destroy_repair_core import run_destroy_repair
 
 from evolutionary_algorithm.evaluation import haversine_distance, evaluate_cluster_direction
 
@@ -261,6 +263,31 @@ def crossover(parent1: Individual, parent2: Individual) -> Individual:
 
     return child
 
+def init_random_population(orders, constraints, population_size) -> List[Individual]:
+    population: List[Individual] = []
+    for _ in range(population_size):
+        ind = Individual()
+        trip_counter = 1
+        for wh_id in set(o.warehouse_id for o in orders):
+            wh_orders = [o for o in orders if o.warehouse_id == wh_id]
+            random.shuffle(wh_orders)
+            chunk_size = constraints.max_order_count
+            for i in range(0, len(wh_orders), chunk_size):
+                chunk = wh_orders[i:i + chunk_size]
+                trans_type = random.choices(
+                    list(constraints.transport_distribution.keys()),
+                    weights=list(constraints.transport_distribution.values())
+                )[0]
+                ind.trips[trip_counter] = Trip(
+                    trip_id=trip_counter,
+                    warehouse_id=wh_id,
+                    transport_type=trans_type,
+                    order_ids=[o.order_id for o in chunk]
+                )
+                trip_counter += 1
+        population.append(ind)
+    return population
+
 def run_evolutionary_clustering(
         algorithm: Algorithms,
         orders: List[Order],
@@ -274,36 +301,35 @@ def run_evolutionary_clustering(
     # 1. Initializing population based on chosen algorithm
 
     if algorithm == Algorithms.DBSCAN:
-        population = seed_population(orders, warehouses_dict, constraints, population_size=50)
-    if algorithm == Algorithms.RND:
-        population: List[Individual] = []
-        for _ in range(population_size):
-            ind = Individual()
-            trip_counter = 1
-            # Group strictly by warehouse
-            for wh_id in set(o.warehouse_id for o in orders):
-                wh_orders = [o for o in orders if o.warehouse_id == wh_id]
-                random.shuffle(wh_orders)
+        population = seed_population(orders, warehouses_dict, constraints, population_size=population_size)
 
-                # Chunk orders into initial trips
-                chunk_size = constraints.max_order_count
-                for i in range(0, len(wh_orders), chunk_size):
-                    chunk = wh_orders[i:i + chunk_size]
-                    trans_type = random.choices(
-                        list(constraints.transport_distribution.keys()),
-                        weights=list(constraints.transport_distribution.values())
-                    )[0]
+    elif algorithm == Algorithms.RND:
+        population = init_random_population(orders, constraints, population_size)
 
-                    ind.trips[trip_counter] = Trip(
-                        trip_id=trip_counter,
-                        warehouse_id=wh_id,
-                        transport_type=trans_type,
-                        order_ids=[o.order_id for o in chunk]
-                    )
-                    trip_counter += 1
+    elif algorithm == Algorithms.CLWR:
+        base = build_clarke_wright_solution(orders, warehouses_dict, constraints)
+        population = [base] + [mutate(base, orders) for _ in range(population_size - 1)]
 
-            evaluate_fitness(ind, orders_dict, constraints, warehouses_dict)
-            population.append(ind)
+    elif algorithm == Algorithms.DSTR:
+        seed_individual = init_random_population(orders, constraints, population_size=1)[0]
+        population = run_destroy_repair(
+            seed_individual=seed_individual,
+            orders=orders,
+            warehouses_dict=warehouses_dict,
+            constraints=constraints,
+            iterations=200,
+            destroy_fraction=0.2,
+            max_solutions=population_size,
+            rng_seed=42,
+        )
+        if len(population) < population_size:
+            population += init_random_population(orders, constraints, population_size - len(population))
+
+    else:
+        raise ValueError(f"Unknown algorithm: {algorithm}")
+
+    for ind in population:
+        evaluate_fitness(ind, orders_dict, constraints, warehouses_dict)
 
 # 2. Main Evolutionary Loop
     for gen in range(generations):
