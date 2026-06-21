@@ -90,7 +90,6 @@ def main():
     
     print("\n=== Orders ===")
     for o_id, order in controller.state_manager.orders.items():
-        print(f"  {o_id}: Customer {order.customer_id}")
         print(f"    Warehouse: {order.warehouse_id}")
         print(f"    Mass: {order.mass_kg} kg")
         print(f"    Time Window: {order.time_window.start.strftime('%H:%M')} - {order.time_window.end.strftime('%H:%M')}")
