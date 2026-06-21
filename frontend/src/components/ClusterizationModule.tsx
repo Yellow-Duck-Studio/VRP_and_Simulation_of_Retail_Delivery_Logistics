@@ -45,7 +45,7 @@ export default function ClusterizationModule() {
   const getTasks = (alg: string) => {
     const algRes = results[alg];
     if (!algRes) return [];
-    return Object.keys(algRes).sort();
+    return Object.keys(algRes).sort((a, b) => Number(a) - Number(b));
   };
 
   const getVariants = (alg: string, taskKey: string) => {
@@ -139,7 +139,7 @@ export default function ClusterizationModule() {
                     : "Press Run to execute selected algorithms."}
                 </span>
               </div>
-              <ClusterMapCanvas clusters={[]} />
+              <ClusterMapCanvas clusters={[]} taskId="" />
             </div>
           ) : (
             selectedAlgo.map((alg) => {
@@ -190,7 +190,7 @@ export default function ClusterizationModule() {
                     </div>
                   </div>
 
-                  <ClusterMapCanvas clusters={selectedVariantClusters} />
+                  <ClusterMapCanvas clusters={selectedVariantClusters} taskId={selectedTaskKey} />
                 </div>
               );
             })

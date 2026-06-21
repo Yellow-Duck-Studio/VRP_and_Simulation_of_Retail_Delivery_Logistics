@@ -1,5 +1,5 @@
 import {useState, useMemo, useCallback, useRef, useEffect, useId} from "react";
-import { orders, loadOrdersDataset, DATA_BASE_URL, type OrderInfo } from "../api.ts";
+import { orders, loadOrdersDataset, DATA_BASE_URL, getOrder, getOrdersForTask, type OrderInfo } from "../api.ts";
 import {
   PlusIcon,
   MinusIcon,
@@ -8,6 +8,10 @@ import {
 
 interface ClusterMapProps {
   clusters: number[][];
+  // The polygon/task this set of clusters belongs to. order_id values inside
+  // `clusters` are only unique within a given taskId, so this is required to
+  // resolve them to the correct OrderInfo / coordinates.
+  taskId: number | string;
 }
 
 interface Point {
@@ -59,7 +63,7 @@ const formatTime = (isoString: string) => {
   }
 };
 
-export default function ClusterMap({ clusters }: ClusterMapProps) {
+export default function ClusterMap({ clusters, taskId }: ClusterMapProps) {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [virtualDistance, setVirtualDistance] = useState(0);
   const [hoveredPoint, setHoveredPoint] = useState<Point | null>(null);
@@ -94,7 +98,7 @@ export default function ClusterMap({ clusters }: ClusterMapProps) {
 
   const positions = useMemo(() => {
     const posMap = new Map<number, { x: number, y: number }>();
-    const validOrders = Object.values(orders).filter(
+    const validOrders = getOrdersForTask(taskId).filter(
       o => typeof o.lat === 'number' && !isNaN(o.lat) && typeof o.lon === 'number' && !isNaN(o.lon)
     );
 
@@ -146,7 +150,7 @@ export default function ClusterMap({ clusters }: ClusterMapProps) {
     });
 
     return posMap;
-  }, [dataLoaded]);
+  }, [dataLoaded, taskId]);
 
   const points: Point[] = useMemo(() => {
     const result: Point[] = [];
@@ -180,7 +184,7 @@ export default function ClusterMap({ clusters }: ClusterMapProps) {
   }, [points]);
 
   const hoveredClusterIdx = hoveredPoint ? hoveredPoint.clusterIdx : null;
-  
+
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
     isDragging.current = true;
@@ -246,11 +250,11 @@ export default function ClusterMap({ clusters }: ClusterMapProps) {
   const resetView = () => {
     setTransform({ x: 0, y: 0, scale: 1 });
   };
-  
+
 
   const showTooltip = useCallback((point: Point, event: React.MouseEvent) => {
     setHoveredPoint(point);
-    setTooltipOrder(orders[point.id] ?? null);
+    setTooltipOrder(getOrder(taskId, point.id) ?? null);
 
     if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
@@ -268,7 +272,7 @@ export default function ClusterMap({ clusters }: ClusterMapProps) {
         pointerEvents: "none",
       });
     }
-  }, []);
+  }, [taskId]);
 
   const hideTooltip = useCallback(() => {
     setHoveredPoint(null);
