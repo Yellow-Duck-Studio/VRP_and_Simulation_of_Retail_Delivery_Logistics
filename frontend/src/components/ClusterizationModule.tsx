@@ -1,9 +1,9 @@
 import { useState, useCallback } from "react";
 import { PlayIcon } from "@heroicons/react/24/solid";
-import { runClustering } from "../mockData";
+import { runClustering } from "../api.ts";
 import ClusterMapCanvas from "./ClusterMapCanvas";
 
-const AVAILABLE_ALGORITHMS = ["DBScan", "Clarke Wright", "Sweep"];
+const AVAILABLE_ALGORITHMS = ["DBScan", "Clarke Wright", "Sweep", "Destroy & Repair", "Random"];
 
 export default function ClusterizationModule() {
   const [selectedAlgo, setSelectedAlgo] = useState<string[]>([]);
@@ -22,19 +22,24 @@ export default function ClusterizationModule() {
   const handleRun = useCallback(async () => {
     if (selectedAlgo.length === 0) return;
     setLoading(true);
-    const data = await runClustering(selectedAlgo);
-    setResults(data);
+    try {
+      const data = await runClustering(selectedAlgo);
+      setResults(data);
 
-    const initPoly: Record<string, number> = {};
-    const initVar: Record<string, number> = {};
-    selectedAlgo.forEach((alg) => {
-      const tasks = Object.keys(data[alg]).sort();
-      initPoly[alg] = 0;
-      initVar[alg] = 0;
-    });
-    setPolygonIdx(initPoly);
-    setVariantIdx(initVar);
-    setLoading(false);
+      const initPoly: Record<string, number> = {};
+      const initVar: Record<string, number> = {};
+      selectedAlgo.forEach((alg) => {
+        initPoly[alg] = 0;
+        initVar[alg] = 0;
+      });
+      setPolygonIdx(initPoly);
+      setVariantIdx(initVar);
+    } catch (error) {
+      console.error("Clustering failed:", error);
+      alert(`Clasterization failed: ${error}`);
+    } finally {
+      setLoading(false);
+    }
   }, [selectedAlgo]);
 
   const getTasks = (alg: string) => {
