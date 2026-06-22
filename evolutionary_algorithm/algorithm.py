@@ -308,7 +308,7 @@ def run_evolutionary_clustering(
 
     elif algorithm == Algorithms.CLWR:
         base = build_clarke_wright_solution(orders, warehouses_dict, constraints)
-        population = [base] + [mutate(base, orders) for _ in range(population_size - 1)]
+        population = [base] + [mutate(base, orders_dict, warehouses_dict, constraints) for _ in range(population_size - 1)]
 
     elif algorithm == Algorithms.DSTR:
         seed_individual = init_random_population(orders, constraints, population_size=1)[0]
