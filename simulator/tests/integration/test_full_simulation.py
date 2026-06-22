@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from simulator import (
     SimulationController, load_simulation_data
 )
-from simulator.core import EventType
+from simulator.engine import EventType
 
 def test_full_simulation_delivery(temp_json_file):
     start_time = datetime.now() + timedelta(minutes=5)

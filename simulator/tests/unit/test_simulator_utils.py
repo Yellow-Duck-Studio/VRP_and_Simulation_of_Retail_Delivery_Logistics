@@ -1,40 +1,53 @@
 import pytest
 from datetime import datetime, timedelta
-from simulator.core import SimulationController
-from simulator.schemas import Location, CourierType, Order, Courier, TimeWindow, Route, RouteStop, StopType, AffiliationType, CourierStatus
+from simulator.engine import SimulationController, EventManager, StateManager
+from simulator.fsm.courier_fsm import CourierFSM
+from simulator.schemas import (
+    Location, CourierType, Courier, Order, TimeWindow,
+    DistanceMatrix, AffiliationType, CourierStatus
+)
 
 def test_distance_km_fallback():
     """Test distance using haversine without distance matrix"""
-    controller = SimulationController(start_time=datetime.now())
+    state_manager = StateManager()
+    courier = Courier(
+        courier_id="cour_1",
+        courier_type_id="car_1",
+        affiliation_type=AffiliationType.SHIFT,
+        current_location=Location(latitude=55.7558, longitude=37.6173)
+    )
+    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={})
     from_loc = Location(latitude=55.7558, longitude=37.6173)
     to_loc = Location(latitude=55.75, longitude=37.61)
-    dist = controller._distance_km(from_loc, to_loc)
-
+    dist = fsm._distance_km(from_loc, to_loc)
     assert 0.5 < dist < 1.0
 
 def test_distance_km_from_matrix():
     """Test distance reading from distance matrix"""
-    controller = SimulationController(start_time=datetime.now())
-
-    from simulator.schemas import DistanceMatrix
-    matrix = DistanceMatrix.from_dict({("wh_1", "ord_1"): 2.5})
-    controller.state_manager.set_distance_matrix(matrix)
+    state_manager = StateManager()
     from_loc = Location(latitude=55.7558, longitude=37.6173)
     to_loc = Location(latitude=55.75, longitude=37.61)
-
     key_from = f"{from_loc.latitude},{from_loc.longitude}"
     key_to = f"{to_loc.latitude},{to_loc.longitude}"
     matrix = DistanceMatrix.from_dict({(key_from, key_to): 2.5})
-    controller.state_manager.set_distance_matrix(matrix)
-    dist = controller._distance_km(from_loc, to_loc)
+    state_manager.set_distance_matrix(matrix)
+
+    courier = Courier(
+        courier_id="cour_1",
+        courier_type_id="car_1",
+        affiliation_type=AffiliationType.SHIFT,
+        current_location=from_loc
+    )
+    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={})
+    dist = fsm._distance_km(from_loc, to_loc)
     assert dist == 2.5
 
 def test_travel_time_seconds():
     """Test travel time calculation"""
-    controller = SimulationController(start_time=datetime.now())
+    state_manager = StateManager()
+    courier_type = CourierType(type_id="car_1", name="Car", capacity_kg=100, speed_kmh=60)
+    state_manager.add_courier_type(courier_type)
 
-    ct = CourierType(type_id="car_1", name="Car", capacity_kg=100, speed_kmh=60)
-    controller.state_manager.add_courier_type(ct)
     courier = Courier(
         courier_id="cour_1",
         courier_type_id="car_1",
@@ -43,15 +56,14 @@ def test_travel_time_seconds():
     )
     from_loc = Location(latitude=55.7558, longitude=37.6173)
     to_loc = Location(latitude=55.75, longitude=37.61)
-
-    seconds = controller._travel_time_seconds(courier, from_loc, to_loc)
-
-    assert 40 < seconds < 50
+    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={})
+    seconds = fsm._travel_time(from_loc, to_loc)
+    # ~0.6 km at 60 km/h -> ~36 sec
+    assert 30 < seconds < 50
 
 def test_add_payment():
-    """test payment sending"""
-    controller = SimulationController(start_time=datetime.now())
-
+    """Test payment calculation and state update (without event publishing)"""
+    state_manager = StateManager()
     courier = Courier(
         courier_id="cour_1",
         courier_type_id="car_1",
@@ -66,19 +78,13 @@ def test_add_payment():
         mass_kg=5.0,
         ready_time=datetime.now()
     )
+    state_manager.delivery_results[order.order_id] = {"sla_met": False}
 
-    controller.state_manager.delivery_results[order.order_id] = {"sla_met": False}
+    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={})
+    fsm._add_payment(distance_km=2.5, order=order, in_window=False, current_time=datetime.now())
 
-    controller._add_payment(courier, 2.5, order)
+    assert state_manager.courier_payments["cour_1"] == 125.0  # 2.5*50
 
-    # When _add_payment will be changed:
-    # assert controller.state_manager.courier_payment["cour_1"] == 125.0  # 2.5*50
-
-    events = controller.event_manager.get_events()
-
-    payment_event = None
-    for ev in events:
-        if ev.event_type == "payment_sent" and ev.data.get("amount"):
-            payment_event = ev
-    assert payment_event is not None
-    assert payment_event.data["amount"] == 125.0  # 2.5*50 (без бонуса)
+    state_manager.courier_payments.clear()
+    fsm._add_payment(distance_km=2.5, order=order, in_window=True, current_time=datetime.now())
+    assert state_manager.courier_payments["cour_1"] == 225.0  # (2.5*50 + 100)

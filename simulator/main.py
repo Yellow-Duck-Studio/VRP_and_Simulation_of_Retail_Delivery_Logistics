@@ -115,7 +115,7 @@ def main():
     events = controller.event_manager.get_events()
     print(f"  Total Events: {len(events)}")
     
-    from simulator.core import EventType
+    from simulator.engine import EventType
     for event_type in EventType:
         event_count = len(controller.event_manager.get_events(event_type))
         if event_count > 0:

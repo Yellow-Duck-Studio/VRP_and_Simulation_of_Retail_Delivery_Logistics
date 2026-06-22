@@ -1,4 +1,4 @@
-from .core import (
+from .engine import (
     SimulationController,
     TimeManager,
     EventManager,
