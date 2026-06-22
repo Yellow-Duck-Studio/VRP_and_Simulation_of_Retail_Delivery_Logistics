@@ -8,10 +8,8 @@ import {
 
 interface ClusterMapProps {
   clusters: number[][];
-  // The polygon/task this set of clusters belongs to. order_id values inside
-  // `clusters` are only unique within a given taskId, so this is required to
-  // resolve them to the correct OrderInfo / coordinates.
   taskId: number | string;
+  isRunning?: boolean;
 }
 
 interface Point {
@@ -63,7 +61,7 @@ const formatTime = (isoString: string) => {
   }
 };
 
-export default function ClusterMap({ clusters, taskId }: ClusterMapProps) {
+export default function ClusterMap({ clusters, taskId, isRunning = false }: ClusterMapProps) {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [virtualDistance, setVirtualDistance] = useState(0);
   const [hoveredPoint, setHoveredPoint] = useState<Point | null>(null);
@@ -84,7 +82,6 @@ export default function ClusterMap({ clusters, taskId }: ClusterMapProps) {
     if (Object.keys(orders).length === 0) {
       loadOrdersDataset(`${DATA_BASE_URL}/data/orders.csv`).finally(() => setDataLoaded(true));
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDataLoaded(true);
     }
   }, []);
@@ -220,7 +217,6 @@ export default function ClusterMap({ clusters, taskId }: ClusterMapProps) {
     setTransform({ x: 0, y: 0, scale: 1 });
   }, []);
 
-
   const zoomIn = () => {
     setTransform(prev => {
       const newScale = Math.min(prev.scale * 1.2, 5);
@@ -250,7 +246,6 @@ export default function ClusterMap({ clusters, taskId }: ClusterMapProps) {
   const resetView = () => {
     setTransform({ x: 0, y: 0, scale: 1 });
   };
-
 
   const showTooltip = useCallback((point: Point, event: React.MouseEvent) => {
     setHoveredPoint(point);
@@ -292,6 +287,154 @@ export default function ClusterMap({ clusters, taskId }: ClusterMapProps) {
 
 
   if (!clusters || clusters.length === 0) {
+    if (isRunning) {
+      return (
+        <div className="relative w-full overflow-hidden border border-gray-200 rounded-lg bg-slate-50 flex items-center justify-center min-h-[400px]">
+          <svg
+            viewBox={`0 0 ${VIEW_BOX_WIDTH} ${VIEW_BOX_HEIGHT}`}
+            className="w-full h-auto max-h-[600px]"
+            preserveAspectRatio="xMidYMid meet"
+          >
+            <style>{`
+              @keyframes slideLoop {
+                0% { transform: translateX(850px); opacity: 0; }
+                8.33% { transform: translateX(400px); opacity: 1; }
+                33.33% { transform: translateX(400px); opacity: 1; }
+                41.66% { transform: translateX(-100px); opacity: 0; }
+                100% { transform: translateX(-100px); opacity: 0; }
+              }
+              .runner-anim { animation: slideLoop 6s ease-in-out infinite; opacity: 0; }
+              .moped-anim { animation: slideLoop 6s ease-in-out infinite; animation-delay: 2s; opacity: 0; }
+              .car-anim { animation: slideLoop 6s ease-in-out infinite; animation-delay: 4s; opacity: 0; }
+            `}</style>
+
+            {/* Road */}
+            <line x1="0" y1="372" x2={VIEW_BOX_WIDTH} y2="372" stroke="#e2e8f0" strokeWidth="2" />
+
+            {/* Runner */}
+            <g className="runner-anim">
+              <g transform="translate(0, 372)">
+                <g>
+                  <animateTransform attributeName="transform" type="translate" values="0,-4; 0,-8; 0,-4" dur="0.4s" repeatCount="indefinite" />
+
+                  <rect x="-23" y="-70" width="16" height="20" rx="3" fill="#64748b" stroke="#334155" strokeWidth="2" />
+                  <line x1="-15" y1="-70" x2="-15" y2="-50" stroke="#334155" strokeWidth="2"/>
+
+                  <g>
+                    <animateTransform attributeName="transform" type="rotate" values="30 0 -65; -30 0 -65; 30 0 -65" dur="0.4s" repeatCount="indefinite" />
+                    <line x1="0" y1="-65" x2="10" y2="-35" stroke="#94a3b8" strokeWidth="9" strokeLinecap="round" />
+                  </g>
+                  <g>
+                    <animateTransform attributeName="transform" type="rotate" values="-40 0 -30; 40 0 -30; -40 0 -30" dur="0.4s" repeatCount="indefinite" />
+                    <line x1="0" y1="-30" x2="-10" y2="4" stroke="#94a3b8" strokeWidth="11" strokeLinecap="round" />
+                  </g>
+
+                  <path d="M 0,-65 C 5,-50 -2,-35 0,-30" stroke="#94a3b8" strokeWidth="12" strokeLinecap="round" fill="none" />
+
+                  <g>
+                    <animateTransform attributeName="transform" type="rotate" values="40 0 -30; -40 0 -30; 40 0 -30" dur="0.4s" repeatCount="indefinite" />
+                    <line x1="0" y1="-30" x2="15" y2="4" stroke="#94a3b8" strokeWidth="11" strokeLinecap="round" />
+                  </g>
+                  <g>
+                    <animateTransform attributeName="transform" type="rotate" values="-30 0 -65; 30 0 -65; -30 0 -65" dur="0.4s" repeatCount="indefinite" />
+                    <line x1="0" y1="-65" x2="-12" y2="-35" stroke="#94a3b8" strokeWidth="9" strokeLinecap="round" />
+                  </g>
+
+                  <circle cx="2" cy="-80" r="9" fill="#94a3b8" stroke="#94a3b8" strokeWidth="2" />
+                </g>
+              </g>
+            </g>
+
+            {/* Moped */}
+            <g className="moped-anim">
+              <g transform="translate(0, 372)">
+                <g>
+                  <animateTransform attributeName="transform" type="translate" values="0,0; 0,-2; 0,0" dur="0.3s" repeatCount="indefinite" />
+
+                  <path d="M -35,-20 L -15,-20 L 10,-40 L 35,-40 Q 40,-40 40,-35 L 25,-20 L 10,-20" fill="#334155" />
+                  <path d="M 10,-40 C 0,-40 -10,-20 -15,-20" fill="none" stroke="#334155" strokeWidth="6" strokeLinecap="round" />
+                  <line x1="38" y1="-39" x2="30" y2="-48" stroke="#334155" strokeWidth="4" strokeLinecap="round" />
+
+                  {/* BAG */}
+                  <g transform="rotate(45 90 75)">
+                    <rect x="-82" y="50" width="16" height="20" rx="2" fill="#64748b" stroke="#334155" strokeWidth="2" />
+                    <line x1="-75" y1="50" x2="-75" y2="70" stroke="#334155" strokeWidth="2" />
+                  </g>
+
+                  {/* Courier */}
+                  <path d="M 4 -49 Q -5 -43 -16 -29" stroke="#94a3b8" strokeWidth="10" strokeLinecap="round" fill="none" />
+                  <circle cx="11" cy="-58" r="9" fill="#94a3b8" stroke="#94a3b8" strokeWidth="2" />
+                  <line x1="-1" y1="-47" x2="25" y2="-40" stroke="#94a3b8" strokeWidth="5" strokeLinecap="round" />
+                  {/* legs */}
+                  <line x1="-16" y1="-29" x2="5" y2="-29" stroke="#94a3b8" strokeWidth="8" strokeLinecap="round" />
+                  <line x1="5" y1="-29" x2="-3" y2="-10" stroke="#94a3b8" strokeWidth="8" strokeLinecap="round" />
+                </g>
+
+                <g transform="translate(-25, -12)">
+                  <circle cx="0" cy="0" r="12" fill="#1e293b" />
+                  <circle cx="0" cy="0" r="6" fill="#94a3b8" />
+                  <g>
+                    <animateTransform attributeName="transform" type="rotate" values="0; 360" dur="0.4s" repeatCount="indefinite" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#cbd5e1" strokeWidth="2" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#cbd5e1" strokeWidth="2" />
+                  </g>
+                </g>
+                <g transform="translate(25, -12)">
+                  <circle cx="0" cy="0" r="12" fill="#1e293b" />
+                  <circle cx="0" cy="0" r="6" fill="#94a3b8" />
+                  <g>
+                    <animateTransform attributeName="transform" type="rotate" values="0; 360" dur="0.4s" repeatCount="indefinite" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#cbd5e1" strokeWidth="2" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#cbd5e1" strokeWidth="2" />
+                  </g>
+                </g>
+              </g>
+            </g>
+
+            {/* Car */}
+            <g className="car-anim">
+              <g transform="translate(0, 372)">
+                <g>
+                  <animateTransform attributeName="transform" type="translate" values="0,0; 0,-2; 0,0" dur="0.5s" repeatCount="indefinite" />
+
+                  <path d="M -45,-15 L 45,-15 L 45,-25 C 45,-30 40,-35 30,-35 L 20,-35 L 10,-45 C 5,-50 -5,-50 -15,-50 L -30,-50 C -40,-50 -45,-40 -45,-30 Z" fill="#94a3b8" stroke="#334155" strokeWidth="2" />
+
+                  <path d="M -12,-47 L 6,-47 L 17,-35 L -12,-35 Z" fill="#e2e8f0" stroke="#94a3b8" strokeWidth="2" />
+                  <line x1="0" y1="-47" x2="0" y2="-35" stroke="#94a3b8" strokeWidth="2" />
+
+                  <path d="M 36,-30 L 43,-30 L 43,-25 L 36,-25 Z" fill="#e2e8f0" />
+                  {/*<path d="M -45,-30 L -42,-30 L -42,-25 L -45,-25 Z" fill="#e2e8f0" />*/}
+                </g>
+
+                <g transform="translate(-25, -13)">
+                  <circle cx="0" cy="0" r="12" fill="#1e293b" />
+                  <circle cx="0" cy="0" r="6" fill="#cbd5e1" />
+                  <g>
+                    <animateTransform attributeName="transform" type="rotate" values="0; 360" dur="0.5s" repeatCount="indefinite" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#475569" strokeWidth="2" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#475569" strokeWidth="2" />
+                  </g>
+                </g>
+                <g transform="translate(25, -13)">
+                  <circle cx="0" cy="0" r="12" fill="#1e293b" />
+                  <circle cx="0" cy="0" r="6" fill="#cbd5e1" />
+                  <g>
+                    <animateTransform attributeName="transform" type="rotate" values="0; 360" dur="0.5s" repeatCount="indefinite" />
+                    <line x1="0" y1="-6" x2="0" y2="6" stroke="#475569" strokeWidth="2" />
+                    <line x1="-6" y1="0" x2="6" y2="0" stroke="#475569" strokeWidth="2" />
+                  </g>
+                </g>
+              </g>
+            </g>
+
+            <text x={VIEW_BOX_WIDTH / 2} y={VIEW_BOX_HEIGHT - 70} textAnchor="middle" fill="#475569" fontSize="20" fontWeight="600">
+              Clusterization in progress...
+            </text>
+          </svg>
+        </div>
+      );
+    }
+
     const idlePath = "M 200,300 L 300,150 L 500,150 L 600,300 L 500,450 L 300,450 Z";
     const idleCars = [
       { fill: "#3b82f6", begin: "0s" },

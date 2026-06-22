@@ -1,14 +1,60 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { PlayIcon } from "@heroicons/react/24/solid";
-import { runClustering } from "../api.ts";
+import { runClusteringWithProgress, type ClusterProgressEvent } from "../api.ts";
 import ClusterMapCanvas from "./ClusterMapCanvas";
 
 const AVAILABLE_ALGORITHMS = ["DBScan", "Clarke Wright", "Sweep", "Destroy & Repair", "Random"];
+
+function RunLogPanel({ lines, active }: { lines: string[]; active: boolean }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [lines]);
+
+  return (
+    <div className="mt-3 rounded-lg overflow-hidden border border-gray-200">
+      <div className="px-3 py-1.5 flex items-center gap-2 border-b border-gray-200">
+        <span className={`h-2 w-2 rounded-full ${active ? "bg-green-400" : "bg-gray-500"}`} />
+        <span className="text-xs text-gray-400 font-mono">
+          {active ? "running..." : "in queue"}
+        </span>
+      </div>
+      <div ref={scrollRef} className=" text-[11px] font-mono leading-relaxed p-3 h-40 overflow-y-auto">
+        {lines.length === 0 ? (
+          <div className="text-gray-500">Wait for output...</div>
+        ) : (
+          lines.map((line, i) => {
+            const isHeader = line.includes("RUNNING EVOLUTION") || line.startsWith("===");
+            const isSuccess = line.startsWith("Successfully") || line.startsWith("Done!");
+            const isGen = line.startsWith("Gen ");
+            const cls = isHeader
+              ? "text-amber-500 font-semibold"
+              : isSuccess
+              ? "text-emerald-500"
+              : isGen
+              ? "text-sky-500"
+              : "text-gray-500";
+            return (
+              <div key={i} className={cls}>
+                {line}
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function ClusterizationModule() {
   const [selectedAlgo, setSelectedAlgo] = useState<string[]>([]);
   const [results, setResults] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
+  const [activeAlgo, setActiveAlgo] = useState<string | null>(null);
+  const [logsByAlgo, setLogsByAlgo] = useState<Record<string, string[]>>({});
 
   const [polygonIdx, setPolygonIdx] = useState<Record<string, number>>({});
   const [variantIdx, setVariantIdx] = useState<Record<string, number>>({});
@@ -22,23 +68,42 @@ export default function ClusterizationModule() {
   const handleRun = useCallback(async () => {
     if (selectedAlgo.length === 0) return;
     setLoading(true);
-    try {
-      const data = await runClustering(selectedAlgo);
-      setResults(data);
+    setResults({});
+    setPolygonIdx({});
+    setVariantIdx({});
+    setLogsByAlgo({});
+    setActiveAlgo(null);
 
-      const initPoly: Record<string, number> = {};
-      const initVar: Record<string, number> = {};
-      selectedAlgo.forEach((alg) => {
-        initPoly[alg] = 0;
-        initVar[alg] = 0;
+    try {
+      await runClusteringWithProgress(selectedAlgo, (evt: ClusterProgressEvent) => {
+        if (evt.type === "algo_start" && evt.algorithm) {
+          const alg = evt.algorithm;
+          setActiveAlgo(alg);
+          setLogsByAlgo((prev) => (prev[alg] ? prev : { ...prev, [alg]: [] }));
+        } else if (evt.type === "log" && evt.algorithm && evt.line) {
+          const alg = evt.algorithm;
+          const line = evt.line;
+          setLogsByAlgo((prev) => {
+            const existing = prev[alg] ?? [];
+            // keep the buffer bounded so a long run doesn't blow up memory/DOM
+            return { ...prev, [alg]: [...existing, line].slice(-400) };
+          });
+        } else if (evt.type === "algo_done" && evt.algorithm && evt.data) {
+          const alg = evt.algorithm;
+          const data = evt.data;
+          setResults((prev) => ({ ...prev, [alg]: data }));
+          setPolygonIdx((prev) => ({ ...prev, [alg]: 0 }));
+          setVariantIdx((prev) => ({ ...prev, [alg]: 0 }));
+        } else if (evt.type === "error") {
+          console.error("Clustering error:", evt.message);
+        }
       });
-      setPolygonIdx(initPoly);
-      setVariantIdx(initVar);
     } catch (error) {
       console.error("Clustering failed:", error);
       alert(`Clasterization failed: ${error}`);
     } finally {
       setLoading(false);
+      setActiveAlgo(null);
     }
   }, [selectedAlgo]);
 
@@ -66,6 +131,7 @@ export default function ClusterizationModule() {
   };
 
   const hasResultsToDisplay = selectedAlgo.some((alg) => results[alg]);
+  const hasStartedRun = loading || hasResultsToDisplay;
 
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 mb-6">
@@ -130,7 +196,7 @@ export default function ClusterizationModule() {
         </div>
 
         <div className="flex-1 space-y-6">
-          {!hasResultsToDisplay ? (
+          {!hasStartedRun ? (
             <div className="border border-gray-200 rounded-lg p-4">
               <div className="mb-3 text-sm text-gray-500 flex justify-between items-center">
                 <span>
@@ -144,12 +210,39 @@ export default function ClusterizationModule() {
           ) : (
             selectedAlgo.map((alg) => {
               const tasks = getTasks(alg);
-              if (tasks.length === 0) return null;
+
+              if (tasks.length === 0) {
+                // No results yet for this algorithm — it's either currently
+                // running or queued behind another one.
+                const isActive = activeAlgo === alg;
+                const lines = logsByAlgo[alg] ?? [];
+                return (
+                  <div key={alg} className="border border-gray-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded">
+                        {alg}
+                      </div>
+                      <span
+                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                          isActive ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {isActive ? "Running" : "In queue"}
+                      </span>
+                    </div>
+
+                    <ClusterMapCanvas clusters={[]} taskId="" isRunning />
+                    <RunLogPanel lines={lines} active={isActive} />
+                  </div>
+                );
+              }
+
               const selectedTaskIdx = polygonIdx[alg] ?? 0;
               const selectedTaskKey = tasks[selectedTaskIdx] || tasks[0];
               const variants = getVariants(alg, selectedTaskKey);
               const selectedVarIdx = variantIdx[alg] ?? 0;
               const selectedVariantClusters = variants[selectedVarIdx] || [];
+              const lines = logsByAlgo[alg] ?? [];
 
               return (
                 <div key={alg} className="border border-gray-200 rounded-lg p-4">
@@ -191,6 +284,14 @@ export default function ClusterizationModule() {
                   </div>
 
                   <ClusterMapCanvas clusters={selectedVariantClusters} taskId={selectedTaskKey} />
+                  {lines.length > 0 && (
+                    <details className="mt-3">
+                      <summary className="text-xs text-gray-400 cursor-pointer select-none">
+                        Running logs
+                      </summary>
+                      <RunLogPanel lines={lines} active={false} />
+                    </details>
+                  )}
                 </div>
               );
             })
