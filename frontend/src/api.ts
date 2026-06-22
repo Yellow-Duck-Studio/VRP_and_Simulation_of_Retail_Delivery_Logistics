@@ -43,6 +43,7 @@ export function getOrdersForTask(taskId: number | string): OrderInfo[] {
 
 export const API_BASE_URL = "http://localhost:3001/api";
 export const DATA_BASE_URL = "http://localhost:3001";
+export const WS_BASE_URL = DATA_BASE_URL.replace(/^http/, "ws");
 
 export async function loadOrdersDataset(csvUrl: string = `${DATA_BASE_URL}/data/orders.csv`): Promise<void> {
   try {
@@ -92,6 +93,75 @@ export async function runClustering(algorithms: string[]): Promise<Record<string
   }
 
   return await response.json();
+}
+
+export interface ClusterProgressEvent {
+  type: "algo_start" | "log" | "algo_done" | "error" | "done";
+  algorithm?: string;
+  line?: string;
+  message?: string;
+  data?: Record<string, any>;
+  results?: Record<string, any>;
+}
+
+/**
+ * Runs the requested algorithms via the /ws/cluster WebSocket endpoint and
+ * streams live progress (subprocess log lines, per-algorithm completion)
+ * through `onEvent` as it happens. Resolves with the same combined results
+ * shape as `runClustering` once everything is done.
+ */
+export function runClusteringWithProgress(
+  algorithms: string[],
+  onEvent: (event: ClusterProgressEvent) => void
+): Promise<Record<string, any>> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const ws = new WebSocket(`${WS_BASE_URL}/ws/cluster`);
+
+    ws.onopen = () => {
+      ws.send(JSON.stringify({ algorithms }));
+    };
+
+    ws.onmessage = (event) => {
+      let data: ClusterProgressEvent;
+      try {
+        data = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+
+      onEvent(data);
+
+      if (data.type === "done") {
+        settled = true;
+        resolve(data.results || {});
+        ws.close();
+      } else if (data.type === "error" && !data.algorithm) {
+        settled = true;
+        reject(new Error(data.message || "Clustering failed"));
+        ws.close();
+      } else if (data.type === "error" && data.algorithm) {
+        // Algorithm-specific error: the server also closes the socket after
+        // sending this, so treat it as fatal for the whole run too.
+        settled = true;
+        reject(new Error(data.message || `Clustering failed for ${data.algorithm}`));
+      }
+    };
+
+    ws.onerror = () => {
+      if (!settled) {
+        settled = true;
+        reject(new Error("WebSocket connection error"));
+      }
+    };
+
+    ws.onclose = () => {
+      if (!settled) {
+        settled = true;
+        reject(new Error("Connection closed before clustering finished"));
+      }
+    };
+  });
 }
 
 export async function runSimulation(): Promise<string> {
