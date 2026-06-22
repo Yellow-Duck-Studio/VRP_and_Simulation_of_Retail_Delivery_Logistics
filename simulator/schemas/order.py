@@ -29,10 +29,10 @@ class Order(BaseModel):
     order_id: str
     warehouse_id: str = Field(..., description="Warehouse this order is bound to")
     delivery_location: Location
-    time_window: TimeWindow
+    delivery_time_window: TimeWindow
     status: OrderStatus = OrderStatus.PENDING
     created_at: datetime = Field(default_factory=datetime.now)
-    assigned_transport_id: Optional[str] = None
+    assigned_courier_id: Optional[str] = None
     cluster_id: Optional[str] = None
     mass_kg: float = Field(..., gt=0, description="Order mass in kg")
     ready_time: datetime = Field(..., description="Time when item is ready for pickup")
@@ -45,7 +45,7 @@ class Order(BaseModel):
     @property
     def deadline(self) -> datetime:
         """Delivery deadline (from clustering task)"""
-        return self.time_window.end
+        return self.delivery_time_window.end
     
     @property
     def weight(self) -> float:

@@ -90,10 +90,9 @@ def main():
     
     print("\n=== Orders ===")
     for o_id, order in controller.state_manager.orders.items():
-        print(f"  {o_id}: Customer {order.customer_id}")
         print(f"    Warehouse: {order.warehouse_id}")
         print(f"    Mass: {order.mass_kg} kg")
-        print(f"    Time Window: {order.time_window.start.strftime('%H:%M')} - {order.time_window.end.strftime('%H:%M')}")
+        print(f"    Time Window: {order.delivery_time_window.start.strftime('%H:%M')} - {order.delivery_time_window.end.strftime('%H:%M')}")
         print(f"    Ready Time: {order.ready_time.strftime('%H:%M')}")
         print(f"    Status: {order.status}")
     
@@ -114,13 +113,26 @@ def main():
     
     print("\n=== Event Summary ===")
     events = controller.event_manager.get_events()
-    print(f"Total Events: {len(events)}")
+    print(f"  Total Events: {len(events)}")
     
     from simulator.core import EventType
     for event_type in EventType:
         event_count = len(controller.event_manager.get_events(event_type))
         if event_count > 0:
             print(f"  {event_type.value}: {event_count}")
+
+    results = controller.get_results()
+
+    print("\n=== Delivery Results ===")
+    for order_id, delivery_time in results["order_delivery_times"].items():
+        in_window = results["order_delivered_in_window"][order_id]
+        print(f"  Order {order_id}: delivered at {delivery_time}, in window: {in_window}")
+
+    print("\n=== Courier Payments ===")
+    for courier_id, payment in results["courier_payments"].items():
+        print(f"  Courier {courier_id}: {payment:.2f} rub")
+
+    print(f"  Total delivery cost: {results['total_delivery_cost']:.2f} rub")
     
     # Save results if output path specified
     if args.output:

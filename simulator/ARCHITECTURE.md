@@ -15,7 +15,8 @@ Simulator for retail delivery logistics and Vehicle Routing Problem (VRP) optimi
 
 #### Core Entities
 - **Order**: Delivery orders
-  - `order_id`, `warehouse_id`, `delivery_location`, `time_window` (when should be delivered), `mass_kg`, `ready_time`  
+  - `order_id`, `warehouse_id`, `delivery_location`, `delivery_time_window` (when should be delivered), `mass_kg`, 
+    `ready_time`  
   - Status: `pending`, `assigned`, `in_transit`, `delivered`, `cancelled`
   
 - **Warehouse**: Distribution centers

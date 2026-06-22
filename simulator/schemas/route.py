@@ -1,7 +1,24 @@
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from datetime import datetime
+from enum import Enum
 from .order import Location
+
+
+class StopType(str, Enum):
+    PICKUP = "pickup"
+    DELIVERY = "delivery"
+
+
+class RouteStop(BaseModel):
+    order_id: str
+    location: Location
+    stop_type: StopType
+    sequence_number: int = Field(..., ge=1)
+    service_duration_minutes: int = Field(default=5, ge=0)
+    # optional:
+    planned_arrival_time: Optional[datetime] = None
+    planned_departure_time: Optional[datetime] = None
 
 
 class Route(BaseModel):
@@ -15,3 +32,4 @@ class Route(BaseModel):
     total_distance_km: float = Field(default=0.0, ge=0)
     total_duration_minutes: int = Field(default=0, ge=0)
     status: str = "planned"  # planned, in_progress, completed, cancelled
+    stops: List[RouteStop] = Field(default_factory=list)
