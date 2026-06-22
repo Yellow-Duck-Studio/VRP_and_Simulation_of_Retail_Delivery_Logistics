@@ -49,19 +49,29 @@ def main():
     )
     
     args = parser.parse_args()
-    
+
+    base_dir = Path(__file__).resolve().parent
+    input_path = Path(args.input)
+
+    if not input_path.is_absolute():
+        input_path = base_dir / input_path
+
+    if not input_path.exists():
+        fallback_path = base_dir / "simulator" / input_path.name
+        if fallback_path.exists():
+            input_path = fallback_path
+
+    if not input_path.exists():
+        print(f"Error: Input file not found at {input_path}")
+        return 1
+
     start_time = datetime.fromisoformat(args.start_time)
     controller = SimulationController(
         start_time=start_time,
         time_step_minutes=args.time_step
     )
-    
-    input_path = Path(args.input)
-    if not input_path.exists():
-        print(f"Error: Input file {args.input} not found")
-        return 1
-    
-    print(f"Loading simulation data from {args.input}...")
+
+    print(f"Loading simulation data from {input_path}...")
     load_simulation_data(str(input_path), controller.state_manager)
     
     print("\n=== Initial State ===")
