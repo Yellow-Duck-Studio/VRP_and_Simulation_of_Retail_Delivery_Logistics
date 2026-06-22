@@ -10,6 +10,7 @@ from evolutionary_algorithm.domain import Algorithms
 from dbscan import seed_population
 from heuristics.savings_core import build_clarke_wright_solution
 from heuristics.destroy_repair_core import run_destroy_repair
+from sweep_seeding import seed_population as seed_population_sweep
 
 from evolutionary_algorithm.evaluation import haversine_distance, evaluate_cluster_direction
 
@@ -305,6 +306,9 @@ def run_evolutionary_clustering(
 
     elif algorithm == Algorithms.RND:
         population = init_random_population(orders, constraints, population_size)
+
+    elif algorithm == Algorithms.SWEEP:
+        population = seed_population_sweep(orders, warehouses_dict, constraints, population_size=population_size)
 
     elif algorithm == Algorithms.CLWR:
         base = build_clarke_wright_solution(orders, warehouses_dict, constraints)
