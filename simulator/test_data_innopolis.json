@@ -243,5 +243,24 @@
       "to_id": "WH_PEREKRESTOK_INNOPOLIS",
       "distance": 1.2
     }
-  ]
+  ],
+  "payment_config": {
+    "rate_per_km": {
+      "car": 60.0,
+      "moped": 45.0,
+      "foot": 25.0
+    },
+    "hourly_rate": {
+      "car": 400.0,
+      "moped": 300.0,
+      "foot": 200.0
+    },
+    "window_bonus": 150.0,
+    "base_fee": 50.0,
+    "affiliation_multipliers": {
+      "shift": 1.0,
+      "exchange": 1.2,
+      "3pl": 0.9
+    }
+  }
 }

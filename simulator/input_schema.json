@@ -158,6 +158,34 @@
         },
         "required": ["from_id", "to_id", "distance"]
       }
+    },
+    "payment_config": {
+      "type": "object",
+      "properties": {
+        "rate_per_km": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 },
+          "default": {}
+        },
+        "hourly_rate": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 },
+          "default": {}
+        },
+        "window_bonus": { "type": "number", "minimum": 0, "default": 100.0 },
+        "base_fee": { "type": "number", "minimum": 0, "default": 0.0 },
+        "affiliation_multipliers": {
+          "type": "object",
+          "properties": {
+            "shift": { "type": "number", "minimum": 0, "default": 1.0 },
+            "exchange": { "type": "number", "minimum": 0, "default": 1.2 },
+            "3pl": { "type": "number", "minimum": 0, "default": 0.9 }
+          },
+          "additionalProperties": false,
+          "default": { "shift": 1.0, "exchange": 1.2, "3pl": 0.9 }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": ["courier_types", "warehouses", "orders", "couriers", "routes", "distance_matrix"]

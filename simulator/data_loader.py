@@ -68,3 +68,16 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     for entry in raw_matrix:
         matrix_dict[(entry["from_id"], entry["to_id"])] = float(entry["distance"])
     state_manager.set_distance_matrix(DistanceMatrix.from_dict(matrix_dict))
+
+    # Payment config
+    payment_config = data.get("payment_config", {})
+    if payment_config:
+        state_manager.payment_config = payment_config
+    else: # Fallback
+        state_manager.payment_config = {
+            "rate_per_km": {"car": 50.0, "moped": 40.0, "foot": 25.0},
+            "hourly_rate": {"car": 350.0, "moped": 250.0, "foot": 150.0},
+            "window_bonus": 100.0,
+            "base_fee": 30.0,
+            "affiliation_multipliers": {"shift": 1.0, "exchange": 1.2, "3pl": 0.9}
+        }

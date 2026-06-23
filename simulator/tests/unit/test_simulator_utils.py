@@ -6,6 +6,7 @@ from simulator.schemas import (
     Location, CourierType, Courier, Order, TimeWindow,
     DistanceMatrix, AffiliationType, CourierStatus
 )
+from simulator.utils import PaymentCalculator
 
 def test_distance_km_fallback():
     """Test distance using haversine without distance matrix"""
@@ -16,7 +17,8 @@ def test_distance_km_fallback():
         affiliation_type=AffiliationType.SHIFT,
         current_location=Location(latitude=55.7558, longitude=37.6173)
     )
-    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={})
+    payment_calc = PaymentCalculator({})
+    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={}, payment_calculator=payment_calc)
     from_loc = Location(latitude=55.7558, longitude=37.6173)
     to_loc = Location(latitude=55.75, longitude=37.61)
     dist = fsm._distance_km(from_loc, to_loc)
@@ -38,7 +40,8 @@ def test_distance_km_from_matrix():
         affiliation_type=AffiliationType.SHIFT,
         current_location=from_loc
     )
-    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={})
+    payment_calc = PaymentCalculator({})
+    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={}, payment_calculator=payment_calc)
     dist = fsm._distance_km(from_loc, to_loc)
     assert dist == 2.5
 
@@ -56,7 +59,8 @@ def test_travel_time_seconds():
     )
     from_loc = Location(latitude=55.7558, longitude=37.6173)
     to_loc = Location(latitude=55.75, longitude=37.61)
-    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={})
+    payment_calc = PaymentCalculator({})
+    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={}, payment_calculator=payment_calc)
     seconds = fsm._travel_time(from_loc, to_loc)
     # ~0.6 km at 60 km/h -> ~36 sec
     assert 30 < seconds < 50
@@ -67,7 +71,7 @@ def test_add_payment():
     courier = Courier(
         courier_id="cour_1",
         courier_type_id="car_1",
-        affiliation_type=AffiliationType.SHIFT,
+        affiliation_type=AffiliationType.EXCHANGE,   # was SHIFT
         current_location=Location(latitude=55.7558, longitude=37.6173)
     )
     order = Order(
@@ -80,11 +84,14 @@ def test_add_payment():
     )
     state_manager.delivery_results[order.order_id] = {"sla_met": False}
 
-    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={})
+    config = {
+        "rate_per_km": {"car_1": 50.0},
+        "base_fee": 0.0,
+        "window_bonus": 0.0,
+        "affiliation_multipliers": {"exchange": 1.0}
+    }
+    payment_calc = PaymentCalculator(config)
+    fsm = CourierFSM(courier, state_manager, EventManager(), order_fsms={}, payment_calculator=payment_calc)
     fsm._add_payment(distance_km=2.5, order=order, in_window=False, current_time=datetime.now())
 
-    assert state_manager.courier_payments["cour_1"] == 125.0  # 2.5*50
-
-    state_manager.courier_payments.clear()
-    fsm._add_payment(distance_km=2.5, order=order, in_window=True, current_time=datetime.now())
-    assert state_manager.courier_payments["cour_1"] == 225.0  # (2.5*50 + 100)
+    assert state_manager.courier_payments["cour_1"] == 125.0

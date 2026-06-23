@@ -31,6 +31,7 @@ class Courier(BaseModel):
     current_route_id: Optional[str] = None
     planned_route_ids: List[str] = Field(default_factory=list, description="Sorted list of route ids")
     last_updated: datetime = Field(default_factory=datetime.now)
+    total_work_hours: float = 0.0
     
     def available_capacity(self, courier_type: 'CourierType') -> float:
         return courier_type.capacity_kg - self.current_load

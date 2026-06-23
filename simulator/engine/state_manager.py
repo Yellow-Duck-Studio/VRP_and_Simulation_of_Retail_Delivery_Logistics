@@ -13,6 +13,7 @@ class StateManager:
         self.history: List[dict] = []
         self.delivery_results: Dict[str, dict] = {}
         self.courier_payments: Dict[str, float] = {}
+        self.payment_config: Optional[Dict] = None
 
     def add_order(self, order: Order) -> None:
         self.orders[order.order_id] = order

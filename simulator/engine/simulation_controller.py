@@ -3,6 +3,7 @@ from ..fsm import OrderFSM, CourierFSM
 from .time_manager import TimeManager
 from .event_manager import EventType, Event, EventManager
 from .state_manager import StateManager
+from ..utils import PaymentCalculator
 from typing import Optional, Dict
 
 class SimulationController:
@@ -17,8 +18,14 @@ class SimulationController:
         self.order_fsms: Dict[str, OrderFSM] = {}
         self.courier_fsms: Dict[str, CourierFSM] = {}
 
+        self.payment_calculator = None
+
     def initialize(self) -> None:
         print(f"[{self.time_manager.current_time}] Simulation initialization")
+
+        config = self.state_manager.payment_config or {}
+        self.payment_calculator = PaymentCalculator(config)
+
         self.event_manager.publish(Event(
             EventType.SIMULATION_STARTED,
             self.time_manager.current_time,
@@ -30,7 +37,7 @@ class SimulationController:
             self.order_fsms[order.order_id] = OrderFSM(order, self.event_manager)
 
         for courier in self.state_manager.couriers.values():
-            fsm = CourierFSM(courier, self.state_manager, self.event_manager, self.order_fsms)
+            fsm = CourierFSM(courier, self.state_manager, self.event_manager, self.order_fsms, self.payment_calculator)
             self.courier_fsms[courier.courier_id] = fsm
             if courier.planned_route_ids:
                 fsm.start_next_route(self.time_manager.current_time)
@@ -85,6 +92,8 @@ class SimulationController:
             delivery_times[order_id] = res.get("delivery_time")
             in_window[order_id] = res.get("sla_met", False)
 
+        self._compute_shift_payments()
+
         courier_payments = self.state_manager.courier_payments
         total_cost = sum(courier_payments.values())
 
@@ -94,3 +103,16 @@ class SimulationController:
             "courier_payments": courier_payments,
             "total_delivery_cost": total_cost
         }
+
+    def _compute_shift_payments(self):
+        for courier in self.state_manager.couriers.values():
+            if courier.affiliation_type == "shift" and courier.total_work_hours > 0:
+                payment = self.payment_calculator.calculate(
+                    courier=courier,
+                    distance_km=0.0,
+                    in_window=False,
+                    duration_hours=courier.total_work_hours
+                )
+                self.state_manager.courier_payments[courier.courier_id] = (
+                        self.state_manager.courier_payments.get(courier.courier_id, 0.0) + payment
+                )

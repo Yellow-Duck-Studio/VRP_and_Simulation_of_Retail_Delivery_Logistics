@@ -35,7 +35,7 @@ def sample_json_data():
             {
                 "courier_id": "cour_1",
                 "courier_type_id": "car_1",
-                "affiliation_type": "shift",
+                "affiliation_type": "exchange",
                 "current_location": {"latitude": 55.7558, "longitude": 37.6173},
                 "status": "idle",
                 "current_route_id": None,
@@ -74,7 +74,14 @@ def sample_json_data():
         ],
         "distance_matrix": [
             {"from_id": "wh_1", "to_id": "ord_1", "distance": 2.5}
-        ]
+        ],
+        "payment_config": {
+            "rate_per_km": {"car_1": 60.0, "car": 60.0, "moped": 45.0, "foot": 25.0},
+            "hourly_rate": {"car_1": 400.0, "car": 400.0, "moped": 300.0, "foot": 200.0},
+            "window_bonus": 150.0,
+            "base_fee": 50.0,
+            "affiliation_multipliers": {"shift": 1.0, "exchange": 1.2, "3pl": 0.9}
+        }
     }
 
 @pytest.fixture

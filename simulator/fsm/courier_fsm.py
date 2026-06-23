@@ -4,15 +4,18 @@ from ..engine.event_manager import EventType, Event, EventManager
 from ..engine.state_manager import StateManager
 from ..schemas import Courier, CourierStatus, StopType, Location
 from .order_fsm import OrderFSM
+from ..utils import PaymentCalculator
 
 class CourierFSM:
     def __init__(self, courier: Courier, state_manager: StateManager,
-                 event_manager: EventManager, order_fsms: Dict[str, OrderFSM]):
+                 event_manager: EventManager, order_fsms: Dict[str, OrderFSM], payment_calculator: PaymentCalculator):
         self.courier = courier
         self.state_manager = state_manager
         self.event_manager = event_manager
         self.order_fsms = order_fsms
         self.progress = None
+        self.payment_calculator = payment_calculator
+        self.route_start_time = None
 
     def start_next_route(self, current_time: datetime) -> bool:
         """Initiates the next planned route. Returns True if started"""
@@ -24,6 +27,7 @@ class CourierFSM:
         if not route or not route.stops:
             return False
 
+        self.route_start_time = current_time
         self.courier.status = CourierStatus.DELIVERING
         self.courier.current_route_id = next_route_id
 
@@ -145,6 +149,10 @@ class CourierFSM:
                 {},
                 self.courier.courier_id
             ))
+        if self.route_start_time:
+            duration_hours = (current_time - self.route_start_time).total_seconds() / 3600.0
+            self.courier.total_work_hours += duration_hours
+            self.route_start_time = None
 
     # ------------------------------------------------------------------
     # Helper methods – they use the state_manager for distance and types
@@ -181,22 +189,17 @@ class CourierFSM:
 
     def _add_payment(self, distance_km: float, order, in_window: bool, current_time: datetime) -> None:
         """Calculate and add payment for a delivery segment."""
-        rate_per_km = 50.0
-        window_bonus = 100.0
-        bonus = window_bonus if in_window else 0.0
-
-        multiplier = {
-            "shift": 1.0,
-            "exchange": 1.2,
-            "3pl": 0.9
-        }.get(self.courier.affiliation_type, 1.0)
-
-        payment = (rate_per_km * distance_km + bonus) * multiplier
-
-        self.state_manager.courier_payments[self.courier.courier_id] = (
-            self.state_manager.courier_payments.get(self.courier.courier_id, 0.0) + payment
+        if self.courier.affiliation_type == "shift":
+            return
+        payment = self.payment_calculator.calculate(
+            courier=self.courier,
+            distance_km=distance_km,
+            in_window=in_window,
+            duration_hours=0.0
         )
-
+        self.state_manager.courier_payments[self.courier.courier_id] = (
+                self.state_manager.courier_payments.get(self.courier.courier_id, 0.0) + payment
+        )
         self.event_manager.publish(Event(
             EventType.PAYMENT_SENT,
             current_time,
