@@ -1,3 +1,10 @@
+export interface WarehouseInfo {
+  taskId: number;
+  id: number;
+  lat: number;
+  lon: number;
+}
+
 export interface OrderInfo {
   taskId: number;
   id: number;
@@ -78,6 +85,41 @@ export async function loadOrdersDataset(csvUrl: string = `${DATA_BASE_URL}/data/
   }
 }
 
+export let warehouses: Record<string, WarehouseInfo> = {};
+
+function warehouseKey(taskId: number | string, warehouseId: number | string): string {
+  return `${taskId}_${warehouseId}`;
+}
+
+export function getWarehousesForTask(taskId: number | string): WarehouseInfo[] {
+  const tId = normalizeTaskId(taskId);
+  return Object.values(warehouses).filter((w) => w.taskId === tId);
+}
+
+export async function loadWarehousesDataset(csvUrl: string = `${DATA_BASE_URL}/data/warehouses.csv`): Promise<void> {
+  try {
+    const response = await fetch(csvUrl);
+    const text = await response.text();
+    const lines = text.trim().split('\n');
+    const newWarehouses: Record<string, WarehouseInfo> = {};
+    for (let i = 1; i < lines.length; i++) {
+      const row = lines[i].split(',');
+      if (row.length < 4) continue;
+      const taskId = parseInt(row[0], 10);
+      const warehouseId = parseInt(row[1], 10);
+      newWarehouses[warehouseKey(taskId, warehouseId)] = {
+        taskId,
+        id: warehouseId,
+        lat: parseFloat(row[2]),
+        lon: parseFloat(row[3]),
+      };
+    }
+    warehouses = newWarehouses;
+  } catch (error) {
+    console.error("Failed to load or parse warehouses.csv:", error);
+  }
+}
+
 export async function runClustering(algorithms: string[]): Promise<Record<string, never>> {
   const response = await fetch(`${API_BASE_URL}/cluster`, {
     method: "POST",
@@ -100,8 +142,8 @@ export interface ClusterProgressEvent {
   algorithm?: string;
   line?: string;
   message?: string;
-  data?: Record<string, any>;
-  results?: Record<string, any>;
+  data?: Record<string, never>;
+  results?: Record<string, never>;
 }
 
 /**
@@ -113,7 +155,7 @@ export interface ClusterProgressEvent {
 export function runClusteringWithProgress(
   algorithms: string[],
   onEvent: (event: ClusterProgressEvent) => void
-): Promise<Record<string, any>> {
+): Promise<Record<string, never>> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const ws = new WebSocket(`${WS_BASE_URL}/ws/cluster`);

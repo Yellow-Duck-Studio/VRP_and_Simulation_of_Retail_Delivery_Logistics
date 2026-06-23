@@ -1,10 +1,16 @@
-import {useState, useMemo, useCallback, useRef, useEffect, useId} from "react";
-import { orders, loadOrdersDataset, DATA_BASE_URL, getOrder, getOrdersForTask, type OrderInfo } from "../api.ts";
+import React, {useCallback, useEffect, useId, useMemo, useRef, useState} from "react";
 import {
-  PlusIcon,
-  MinusIcon,
-  MapIcon,
-} from '@heroicons/react/24/outline';
+  DATA_BASE_URL,
+  getOrder,
+  getOrdersForTask,
+  getWarehousesForTask,
+  loadOrdersDataset,
+  loadWarehousesDataset,
+  type OrderInfo,
+  orders,
+  warehouses
+} from "../api.ts";
+import {MapIcon, MinusIcon, PlusIcon,} from '@heroicons/react/24/outline';
 
 interface ClusterMapProps {
   clusters: number[][];
@@ -18,6 +24,12 @@ interface Point {
   y: number;
   clusterIdx: number;
   orderIdxInCluster: number;
+}
+
+interface WarehousePoint {
+  id: number;
+  x: number;
+  y: number;
 }
 
 const COLORS = [
@@ -67,6 +79,8 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
   const [hoveredPoint, setHoveredPoint] = useState<Point | null>(null);
   const [tooltipOrder, setTooltipOrder] = useState<OrderInfo | null>(null);
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
+  const [hoveredWarehouse, setHoveredWarehouse] = useState<WarehousePoint | null>(null);
+  const [warehouseTooltipStyle, setWarehouseTooltipStyle] = useState<React.CSSProperties>({});
 
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
 
@@ -79,11 +93,20 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
   const arrowId = useId();
 
   useEffect(() => {
-    if (Object.keys(orders).length === 0) {
-      loadOrdersDataset(`${DATA_BASE_URL}/data/orders.csv`).finally(() => setDataLoaded(true));
-    } else {
+    const loadAll = async () => {
+      const promises: Promise<void>[] = [];
+      if (Object.keys(orders).length === 0) {
+        promises.push(loadOrdersDataset(`${DATA_BASE_URL}/data/orders.csv`));
+      }
+      if (Object.keys(warehouses).length === 0) {
+        promises.push(loadWarehousesDataset(`${DATA_BASE_URL}/data/warehouses.csv`));
+      }
+      if (promises.length > 0) {
+        await Promise.all(promises);
+      }
       setDataLoaded(true);
-    }
+    };
+    loadAll();
   }, []);
 
   useEffect(() => {
@@ -93,13 +116,13 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
     return () => clearInterval(interval);
   }, []);
 
-  const positions = useMemo(() => {
+  const { positions, warehousePoints } = useMemo(() => {
     const posMap = new Map<number, { x: number, y: number }>();
     const validOrders = getOrdersForTask(taskId).filter(
       o => typeof o.lat === 'number' && !isNaN(o.lat) && typeof o.lon === 'number' && !isNaN(o.lon)
     );
 
-    if (validOrders.length === 0) return posMap;
+    if (validOrders.length === 0) return { positions: posMap, warehousePoints: [] as WarehousePoint[] };
 
     const minLat = Math.min(...validOrders.map(o => o.lat));
     const maxLat = Math.max(...validOrders.map(o => o.lat));
@@ -125,12 +148,17 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
     const xOffset = (VIEW_BOX_WIDTH - lonRange * scale) / 2;
     const yOffset = (VIEW_BOX_HEIGHT - latRange * scale) / 2;
 
+    const project = (lat: number, lon: number) => {
+      const cLon = lon * lonCorrection;
+      const x = xOffset + (cLon - correctedMinLon) * scale;
+      const y = yOffset + (maxLat - lat) * scale;
+      return { x, y };
+    };
+
     const coordCounts = new Map<string, number>();
 
     validOrders.forEach(o => {
-      const cLon = o.lon * lonCorrection;
-      let x = xOffset + (cLon - correctedMinLon) * scale;
-      let y = yOffset + (maxLat - o.lat) * scale;
+      let { x, y } = project(o.lat, o.lon);
 
       const coordKey = `${o.lat.toFixed(4)}_${o.lon.toFixed(4)}`;
       const count = coordCounts.get(coordKey) || 0;
@@ -146,8 +174,12 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
       posMap.set(o.id, { x, y });
     });
 
-    return posMap;
-  }, [dataLoaded, taskId]);
+    const whPoints: WarehousePoint[] = getWarehousesForTask(taskId)
+      .filter(w => typeof w.lat === 'number' && !isNaN(w.lat) && typeof w.lon === 'number' && !isNaN(w.lon))
+      .map(w => ({ id: w.id, ...project(w.lat, w.lon) }));
+
+    return { positions: posMap, warehousePoints: whPoints };
+  }, [taskId]);
 
   const points: Point[] = useMemo(() => {
     const result: Point[] = [];
@@ -181,6 +213,20 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
   }, [points]);
 
   const hoveredClusterIdx = hoveredPoint ? hoveredPoint.clusterIdx : null;
+
+  // Orders belonging to the hovered warehouse
+  const warehouseHighlightedOrderIds = useMemo(() => {
+    if (!hoveredWarehouse) return null;
+    const taskOrders = getOrdersForTask(taskId);
+    return new Set(taskOrders.filter(o => o.warehouseId === hoveredWarehouse.id).map(o => o.id));
+  }, [hoveredWarehouse, taskId]);
+
+  // Warehouse id to highlight when hovering an order
+  const highlightedWarehouseId = useMemo(() => {
+    if (!hoveredPoint) return null;
+    const order = getOrder(taskId, hoveredPoint.id);
+    return order ? order.warehouseId : null;
+  }, [hoveredPoint, taskId]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
     if (e.button !== 0) return;
@@ -272,6 +318,28 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
   const hideTooltip = useCallback(() => {
     setHoveredPoint(null);
     setTooltipOrder(null);
+  }, []);
+
+  const showWarehouseTooltip = useCallback((wp: WarehousePoint, event: React.MouseEvent) => {
+    setHoveredWarehouse(wp);
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      let left = event.clientX - rect.left + 15;
+      let top = event.clientY - rect.top + 15;
+      if (left + 180 > rect.width) left = event.clientX - rect.left - 180;
+      if (top + 80 > rect.height) top = event.clientY - rect.top - 80;
+      setWarehouseTooltipStyle({
+        left: `${left}px`,
+        top: `${top}px`,
+        position: "absolute",
+        zIndex: 10,
+        pointerEvents: "none",
+      });
+    }
+  }, []);
+
+  const hideWarehouseTooltip = useCallback(() => {
+    setHoveredWarehouse(null);
   }, []);
 
   const handlePointMouseMove = useCallback((e: React.MouseEvent) => {
@@ -441,7 +509,7 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
       { fill: "#f59e0b", begin: "-4s" },
       { fill: "#ea74e8", begin: "-8s" },
     ];
-  
+
     return (
       <div className="relative w-full overflow-hidden border border-gray-200 rounded-lg bg-slate-50 flex items-center justify-center min-h-[400px]">
         <svg
@@ -465,7 +533,7 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
             <text x="500" y="450" textAnchor="middle" dominantBaseline="middle" fill="#f8fafc" fontSize="12" fontWeight="bold">7</text>
             <circle cx="300" cy="450" r="7" fill="#94a3b8" />
             <text x="300" y="450" textAnchor="middle" dominantBaseline="middle" fill="#f8fafc" fontSize="12" fontWeight="bold">1</text>
-  
+
             {idleCars.map((car, index) => (
               <g key={index}>
                 <rect x="-12" y="-7" width="24" height="14" rx="3" fill={car.fill} stroke="#ffffff" strokeWidth="1.5" />
@@ -474,7 +542,7 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
                 <animateMotion dur="12s" begin={car.begin} repeatCount="indefinite" path={idlePath} rotate="auto" />
               </g>
             ))}
-  
+
             <text x={VIEW_BOX_WIDTH / 2} y={VIEW_BOX_HEIGHT / 2} textAnchor="middle" fill="#475569" fontSize="26" fontWeight="bold">
               Idle Fleet Mileage: {virtualDistance} km
             </text>
@@ -535,7 +603,11 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
 
           {points.map((p) => {
             const isActiveCluster = hoveredClusterIdx !== null && p.clusterIdx === hoveredClusterIdx;
-            const isDimmed = hoveredClusterIdx !== null && p.clusterIdx !== hoveredClusterIdx;
+            const isDimmedByCluster = hoveredClusterIdx !== null && p.clusterIdx !== hoveredClusterIdx;
+            const isHighlightedByWarehouse = warehouseHighlightedOrderIds !== null && warehouseHighlightedOrderIds.has(p.id);
+            const isDimmedByWarehouse = warehouseHighlightedOrderIds !== null && !warehouseHighlightedOrderIds.has(p.id);
+            const isDimmed = isDimmedByCluster || isDimmedByWarehouse;
+            const isHighlighted = isActiveCluster || isHighlightedByWarehouse;
             const radius = BASE_POINT_RADIUS / transform.scale;
 
             return (
@@ -558,8 +630,8 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
                 <circle
                   cx={p.x} cy={p.y} r={radius}
                   fill={COLORS[p.clusterIdx % COLORS.length]}
-                  opacity={isDimmed ? 0.25 : 1}
-                  stroke={isActiveCluster ? "#374151" : "none"}
+                  opacity={isDimmed ? 0.2 : 1}
+                  stroke={isHighlighted ? "#1e293b" : "none"}
                   strokeWidth={2 / transform.scale}
                 />
                 <text
@@ -569,6 +641,65 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
                   style={{ pointerEvents: "none", userSelect: "none" }}
                 >
                   {p.id}
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Warehouse markers — rendered on top of order points */}
+          {warehousePoints.map((wp) => {
+            const WAREHOUSE_R = 13 / transform.scale;
+            const isHovered = hoveredWarehouse?.id === wp.id;
+            const isHighlighted = highlightedWarehouseId === wp.id;
+            const isActive = isHovered || isHighlighted;
+            return (
+              <g
+                key={`wh-${wp.id}`}
+                onMouseEnter={(e) => showWarehouseTooltip(wp, e)}
+                onMouseMove={(e) => {
+                  if (containerRef.current) {
+                    const rect = containerRef.current.getBoundingClientRect();
+                    let left = e.clientX - rect.left + 15;
+                    let top = e.clientY - rect.top + 15;
+                    if (left + 180 > rect.width) left = e.clientX - rect.left - 180;
+                    if (top + 80 > rect.height) top = e.clientY - rect.top - 80;
+                    setWarehouseTooltipStyle(prev => ({ ...prev, left: `${left}px`, top: `${top}px` }));
+                  }
+                }}
+                onMouseLeave={hideWarehouseTooltip}
+                style={{ cursor: "pointer" }}
+              >
+                {/* Glow ring when active */}
+                {isActive && (
+                  <circle
+                    cx={wp.x} cy={wp.y}
+                    r={(WAREHOUSE_R + 3) / transform.scale * transform.scale}
+                    fill="none"
+                    stroke="#FACC15"
+                    strokeWidth={3 / transform.scale}
+                    // opacity={0.6}
+                  />
+                )}
+                {/* Warehouse diamond shape */}
+                <rect
+                  x={wp.x - WAREHOUSE_R * 0.75}
+                  y={wp.y - WAREHOUSE_R * 0.75}
+                  width={WAREHOUSE_R * 1.5}
+                  height={WAREHOUSE_R * 1.5}
+                  rx={2 / transform.scale}
+                  transform={`rotate(45, ${wp.x}, ${wp.y})`}
+                  fill={isActive ? "#1e293b" : "#FACC15"}
+                  stroke={isActive ? "#FACC15" : "#1e293b"}
+                  strokeWidth={2 / transform.scale}
+                />
+                {/* Warehouse icon — "W" label */}
+                <text
+                  x={wp.x} y={wp.y + (3.5 / transform.scale)} // f8fafc 1e293b
+                  textAnchor="middle" fill={isActive ? "#f8fafc" : "#1e293b"}
+                  fontSize={8 / transform.scale} fontWeight="bold"
+                  style={{ pointerEvents: "none", userSelect: "none" }}
+                >
+                  W{wp.id}
                 </text>
               </g>
             );
@@ -622,6 +753,25 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
               Geodata for this Order ID is undefined. Check path if is wrong
             </div>
           )}
+        </div>
+      )}
+
+      {hoveredWarehouse && (
+        <div
+          className="bg-white border border-gray-200 rounded-lg shadow-xl p-3 text-sm w-[170px]"
+          style={warehouseTooltipStyle}
+        >
+          <div className="flex items-center gap-2 font-semibold text-gray-800 border-b border-gray-200 pb-1 mb-2">
+            <span className="inline-flex items-center justify-center w-5 h-5 rounded bg-yellow-400 text-gray-900 text-[10px] font-bold">W</span>
+            Warehouse #{hoveredWarehouse.id}
+          </div>
+          <div className="text-gray-500 text-xs">
+            {(() => {
+              const taskOrders = getOrdersForTask(taskId);
+              const count = taskOrders.filter(o => o.warehouseId === hoveredWarehouse.id).length;
+              return <span>{count} order{count !== 1 ? 's' : ''} assigned</span>;
+            })()}
+          </div>
         </div>
       )}
     </div>
