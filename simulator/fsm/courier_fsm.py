@@ -27,6 +27,9 @@ class CourierFSM:
         if not route or not route.stops:
             return False
 
+        if route.start_time and current_time < route.start_time:
+            return False
+
         self.route_start_time = current_time
         self.courier.status = CourierStatus.DELIVERING
         self.courier.current_route_id = next_route_id
@@ -93,6 +96,11 @@ class CourierFSM:
                 self.move_to_next_stop(current_time, service_time=stop.service_duration_minutes)
 
         elif stop.stop_type == StopType.DELIVERY:
+            if current_time < order.delivery_time_window.start:
+                wait_seconds = (order.delivery_time_window.start - current_time).total_seconds()
+                self.progress["arrival_time"] = current_time + timedelta(seconds=wait_seconds)
+                return
+
             # Deliver
             in_window = order.delivery_time_window.start <= current_time <= order.delivery_time_window.end
             order_fsm.deliver(current_time, in_window)

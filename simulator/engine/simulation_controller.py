@@ -1,5 +1,6 @@
 from datetime import datetime
 from ..fsm import OrderFSM, CourierFSM
+from ..schemas.courier import CourierStatus
 from .time_manager import TimeManager
 from .event_manager import EventType, Event, EventManager
 from .state_manager import StateManager
@@ -53,11 +54,17 @@ class SimulationController:
         return True
 
     def _process_step_logic(self, current_time: datetime) -> None:
-        # 1. Let each order check if it becomes ready (fires ORDER_CREATED)
+        # 1. Let each order check if it becomes ready
         for fsm in self.order_fsms.values():
             fsm.handle_ready(current_time)
 
-        # 2. Let each courier handle arrivals if they have reached their stop
+        # 2. Try to start idle couriers with pending routes
+        for fsm in self.courier_fsms.values():
+            if (fsm.courier.status == CourierStatus.IDLE
+                    and fsm.courier.planned_route_ids):
+                fsm.start_next_route(current_time)
+
+        # 3. Let each courier handle arrivals
         for fsm in self.courier_fsms.values():
             if fsm.progress and fsm.progress["arrival_time"] <= current_time:
                 fsm.handle_arrival(current_time)
