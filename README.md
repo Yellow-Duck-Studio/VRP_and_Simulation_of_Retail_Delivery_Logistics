@@ -2,7 +2,6 @@
 
 ![CI Status](https://github.com/Yellow-Duck-Studio/VRP_and_Simulation_of_Retail_Delivery_Logistics/actions/workflows/simulator_tests.yml/badge.svg)
 ![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
 
 <div align="center">
   <img src="assets/logo.png" alt="Project Logo" width="200"/>
