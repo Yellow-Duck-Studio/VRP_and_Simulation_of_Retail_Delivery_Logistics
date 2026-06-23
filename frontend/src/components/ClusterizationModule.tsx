@@ -93,7 +93,11 @@ export default function ClusterizationModule() {
           const data = evt.data;
           setResults((prev) => ({ ...prev, [alg]: data }));
           setPolygonIdx((prev) => ({ ...prev, [alg]: 0 }));
-          setVariantIdx((prev) => ({ ...prev, [alg]: 0 }));
+          // Default to last variant (best result from evolutionary algorithm)
+          const firstTaskKey = Object.keys(data).sort((a, b) => Number(a) - Number(b))[0];
+          const firstTaskVariants: any[] = firstTaskKey ? data[firstTaskKey] : [];
+          const lastVarIdx = firstTaskVariants.length > 0 ? firstTaskVariants.length - 1 : 0;
+          setVariantIdx((prev) => ({ ...prev, [alg]: lastVarIdx }));
         } else if (evt.type === "error") {
           console.error("Clustering error:", evt.message);
         }
@@ -122,7 +126,12 @@ export default function ClusterizationModule() {
   const handlePolygonChange = (alg: string, newVal: number, max: number) => {
     const clamped = Math.min(Math.max(newVal, 1), max) - 1;
     setPolygonIdx((prev) => ({ ...prev, [alg]: clamped }));
-    setVariantIdx((prev) => ({ ...prev, [alg]: 0 }));
+    // Default to last variant for the newly selected polygon
+    const tasks = getTasks(alg);
+    const taskKey = tasks[clamped] || tasks[0];
+    const variants = getVariants(alg, taskKey);
+    const lastVarIdx = variants.length > 0 ? variants.length - 1 : 0;
+    setVariantIdx((prev) => ({ ...prev, [alg]: lastVarIdx }));
   };
 
   const handleVariantChange = (alg: string, newVal: number, max: number) => {
