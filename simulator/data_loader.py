@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Dict, Any
 
 from . import (
-    Order, Warehouse, Courier, CourierType, Route, DistanceMatrix, StateManager
+    Order, Warehouse, Courier, CourierType, Route, RouteStop, DistanceMatrix, StateManager, Location
 )
 
 
@@ -28,9 +28,9 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     for o_data in data.get("orders", []):
         if isinstance(o_data.get("ready_time"), str):
             o_data["ready_time"] = parse_datetime(o_data["ready_time"])
-        if "time_window" in o_data:
-            o_data["time_window"]["start"] = parse_datetime(o_data["time_window"]["start"])
-            o_data["time_window"]["end"] = parse_datetime(o_data["time_window"]["end"])
+        if "delivery_time_window" in o_data:
+            o_data["delivery_time_window"]["start"] = parse_datetime(o_data["delivery_time_window"]["start"])
+            o_data["delivery_time_window"]["end"] = parse_datetime(o_data["delivery_time_window"]["end"])
         state_manager.add_order(Order(**o_data))
 
     # Couriers
@@ -45,7 +45,22 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
             r_data["start_time"] = parse_datetime(r_data["start_time"])
         if isinstance(r_data.get("end_time"), str):
             r_data["end_time"] = parse_datetime(r_data["end_time"])
-        state_manager.add_route(Route(**r_data))
+        stops_data = r_data.pop("stops", [])
+        route = Route(**r_data)
+        for stop_data in stops_data:
+            location_data = stop_data.pop("location")
+            stop = RouteStop(
+                order_id=stop_data["order_id"],
+                location=Location(**location_data),
+                stop_type=stop_data["stop_type"],
+                sequence_number=stop_data["sequence_number"],
+                service_duration_minutes=stop_data.get("service_duration_minutes", 5)
+            )
+            route.stops.append(stop)
+        route.stops.sort(key=lambda s: s.sequence_number)
+        state_manager.add_route(route)
+        for route_id, route in state_manager.routes.items():
+            print(f"Route {route_id}: {len(route.stops)} stops")
 
     # Distance matrices
     raw_matrix = data.get("distance_matrix", [])
@@ -53,3 +68,16 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     for entry in raw_matrix:
         matrix_dict[(entry["from_id"], entry["to_id"])] = float(entry["distance"])
     state_manager.set_distance_matrix(DistanceMatrix.from_dict(matrix_dict))
+
+    # Payment config
+    payment_config = data.get("payment_config", {})
+    if payment_config:
+        state_manager.payment_config = payment_config
+    else: # Fallback
+        state_manager.payment_config = {
+            "rate_per_km": {"car": 50.0, "moped": 40.0, "foot": 25.0},
+            "hourly_rate": {"car": 350.0, "moped": 250.0, "foot": 150.0},
+            "window_bonus": 100.0,
+            "base_fee": 30.0,
+            "affiliation_multipliers": {"shift": 1.0, "exchange": 1.2, "3pl": 0.9}
+        }

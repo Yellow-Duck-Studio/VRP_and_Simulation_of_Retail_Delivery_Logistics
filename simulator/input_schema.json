@@ -51,7 +51,7 @@
             },
             "required": ["latitude", "longitude"]
           },
-          "time_window": {
+          "delivery_time_window": {
             "type": "object",
             "properties": {
               "start": { "type": "string", "format": "date-time" },
@@ -63,7 +63,7 @@
           "mass_kg": { "type": "number", "exclusiveMinimum": 0 },
           "ready_time": { "type": "string", "format": "date-time" }
         },
-        "required": ["order_id", "warehouse_id", "delivery_location", "time_window", "mass_kg", "ready_time"]
+        "required": ["order_id", "warehouse_id", "delivery_location", "delivery_time_window", "mass_kg", "ready_time"]
       }
     },
     "couriers": {
@@ -120,7 +120,29 @@
           "end_time": { "type": "string", "format": "date-time" },
           "total_distance_km": { "type": "number", "minimum": 0 },
           "total_duration_minutes": { "type": "integer", "minimum": 0 },
-          "status": { "type": "string" }
+          "status": { "type": "string" },
+          "stops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "order_id": { "type": "string" },
+                "location": {
+                  "type": "object",
+                  "properties": {
+                    "latitude": { "type": "number" },
+                    "longitude": { "type": "number" },
+                    "address": { "type": "string" }
+                  },
+                  "required": ["latitude", "longitude"]
+                },
+                "stop_type": { "type": "string", "enum": ["pickup", "delivery"] },
+                "sequence_number": { "type": "integer", "minimum": 1 },
+                "service_duration_minutes": { "type": "integer", "minimum": 0, "default": 5 }
+              },
+              "required": ["order_id", "location", "stop_type", "sequence_number"]
+            }
+          }
         },
         "required": ["route_id", "courier_id", "warehouse_id", "start_location", "end_location", "start_time", "end_time"]
       }
@@ -136,6 +158,34 @@
         },
         "required": ["from_id", "to_id", "distance"]
       }
+    },
+    "payment_config": {
+      "type": "object",
+      "properties": {
+        "rate_per_km": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 },
+          "default": {}
+        },
+        "hourly_rate": {
+          "type": "object",
+          "additionalProperties": { "type": "number", "minimum": 0 },
+          "default": {}
+        },
+        "window_bonus": { "type": "number", "minimum": 0, "default": 100.0 },
+        "base_fee": { "type": "number", "minimum": 0, "default": 0.0 },
+        "affiliation_multipliers": {
+          "type": "object",
+          "properties": {
+            "shift": { "type": "number", "minimum": 0, "default": 1.0 },
+            "exchange": { "type": "number", "minimum": 0, "default": 1.2 },
+            "3pl": { "type": "number", "minimum": 0, "default": 0.9 }
+          },
+          "additionalProperties": false,
+          "default": { "shift": 1.0, "exchange": 1.2, "3pl": 0.9 }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "required": ["courier_types", "warehouses", "orders", "couriers", "routes", "distance_matrix"]

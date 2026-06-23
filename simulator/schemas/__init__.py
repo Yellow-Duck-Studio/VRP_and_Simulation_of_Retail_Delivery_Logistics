@@ -1,8 +1,8 @@
 from .order import Order, OrderStatus, Location, TimeWindow
 from .warehouse import Warehouse
-from .courier import Courier, CourierStatus
+from .courier import Courier, CourierStatus, AffiliationType
 from .courier_type import CourierType
-from .route import Route
+from .route import Route, StopType, RouteStop
 from .distance_matrix import DistanceMatrix
 
 __all__ = [
@@ -14,6 +14,9 @@ __all__ = [
     "Courier",
     "CourierStatus",
     "CourierType",
+    "AffiliationType",
     "Route",
+    "StopType",
+    "RouteStop",
     "DistanceMatrix",
 ]
