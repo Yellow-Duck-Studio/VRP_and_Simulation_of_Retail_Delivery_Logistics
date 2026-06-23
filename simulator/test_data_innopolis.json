@@ -119,53 +119,41 @@
       "courier_id": "COURIER_CAR_001",
       "courier_type_id": "car",
       "affiliation_type": "shift",
-      "current_location": {
-        "latitude": 55.7544,
-        "longitude": 48.7420
-      },
+      "current_location": { "latitude": 55.7544, "longitude": 48.7420 },
       "current_load": 0.0,
       "status": "idle",
-      "assigned_order_ids": [],
+      "assigned_order_ids": ["ORD001"],
       "planned_route_ids": ["ROUTE_CAR_001"]
     },
     {
       "courier_id": "COURIER_FOOT_001",
       "courier_type_id": "foot",
       "affiliation_type": "shift",
-      "current_location": {
-        "latitude": 55.7544,
-        "longitude": 48.7420
-      },
+      "current_location": { "latitude": 55.7544, "longitude": 48.7420 },
       "current_load": 0.0,
       "status": "idle",
-      "assigned_order_ids": [],
-      "planned_route_ids": []
+      "assigned_order_ids": ["ORD002", "ORD005"],
+      "planned_route_ids": ["ROUTE_FOOT_001"]
     },
     {
       "courier_id": "COURIER_MOPED_001",
       "courier_type_id": "moped",
       "affiliation_type": "exchange",
-      "current_location": {
-        "latitude": 55.7520,
-        "longitude": 48.7480
-      },
+      "current_location": { "latitude": 55.7520, "longitude": 48.7480 },
       "current_load": 0.0,
       "status": "idle",
-      "assigned_order_ids": [],
-      "planned_route_ids": []
+      "assigned_order_ids": ["ORD003"],
+      "planned_route_ids": ["ROUTE_MOPED_001"]
     },
     {
       "courier_id": "COURIER_CAR_002",
       "courier_type_id": "car",
       "affiliation_type": "shift",
-      "current_location": {
-        "latitude": 55.7520,
-        "longitude": 48.7480
-      },
+      "current_location": { "latitude": 55.7520, "longitude": 48.7480 },
       "current_load": 0.0,
       "status": "idle",
-      "assigned_order_ids": [],
-      "planned_route_ids": []
+      "assigned_order_ids": ["ORD004"],
+      "planned_route_ids": ["ROUTE_CAR_002"]
     }
   ],
   "routes": [
@@ -195,72 +183,119 @@
           "service_duration_minutes": 3
         }
       ]
+    },
+    {
+      "route_id": "ROUTE_FOOT_001",
+      "courier_id": "COURIER_FOOT_001",
+      "warehouse_id": "WH_PYATEROCHKA_INNOPOLIS",
+      "start_location": { "latitude": 55.7544, "longitude": 48.7420 },
+      "end_location": { "latitude": 55.7525, "longitude": 48.7435 },
+      "start_time": "2024-06-17T11:30:00",
+      "end_time": "2024-06-17T14:30:00",
+      "total_distance_km": 1.6,
+      "total_duration_minutes": 45,
+      "stops": [
+        {
+          "order_id": "ORD002",
+          "location": { "latitude": 55.7544, "longitude": 48.7420 },
+          "stop_type": "pickup",
+          "sequence_number": 1,
+          "service_duration_minutes": 5
+        },
+        {
+          "order_id": "ORD002",
+          "location": { "latitude": 55.7535, "longitude": 48.7400 },
+          "stop_type": "delivery",
+          "sequence_number": 2,
+          "service_duration_minutes": 3
+        },
+        {
+          "order_id": "ORD005",
+          "location": { "latitude": 55.7544, "longitude": 48.7420 },
+          "stop_type": "pickup",
+          "sequence_number": 3,
+          "service_duration_minutes": 5
+        },
+        {
+          "order_id": "ORD005",
+          "location": { "latitude": 55.7525, "longitude": 48.7435 },
+          "stop_type": "delivery",
+          "sequence_number": 4,
+          "service_duration_minutes": 3
+        }
+      ]
+    },
+    {
+      "route_id": "ROUTE_MOPED_001",
+      "courier_id": "COURIER_MOPED_001",
+      "warehouse_id": "WH_PEREKRESTOK_INNOPOLIS",
+      "start_location": { "latitude": 55.7520, "longitude": 48.7480 },
+      "end_location": { "latitude": 55.7510, "longitude": 48.7500 },
+      "start_time": "2024-06-17T11:30:00",
+      "end_time": "2024-06-17T12:15:00",
+      "total_distance_km": 0.6,
+      "total_duration_minutes": 20,
+      "stops": [
+        {
+          "order_id": "ORD003",
+          "location": { "latitude": 55.7520, "longitude": 48.7480 },
+          "stop_type": "pickup",
+          "sequence_number": 1,
+          "service_duration_minutes": 5
+        },
+        {
+          "order_id": "ORD003",
+          "location": { "latitude": 55.7510, "longitude": 48.7500 },
+          "stop_type": "delivery",
+          "sequence_number": 2,
+          "service_duration_minutes": 3
+        }
+      ]
+    },
+    {
+      "route_id": "ROUTE_CAR_002",
+      "courier_id": "COURIER_CAR_002",
+      "warehouse_id": "WH_PEREKRESTOK_INNOPOLIS",
+      "start_location": { "latitude": 55.7520, "longitude": 48.7480 },
+      "end_location": { "latitude": 55.7555, "longitude": 48.7465 },
+      "start_time": "2024-06-17T14:30:00",
+      "end_time": "2024-06-17T13:20:00",
+      "total_distance_km": 0.7,
+      "total_duration_minutes": 25,
+      "stops": [
+        {
+          "order_id": "ORD004",
+          "location": { "latitude": 55.7520, "longitude": 48.7480 },
+          "stop_type": "pickup",
+          "sequence_number": 1,
+          "service_duration_minutes": 5
+        },
+        {
+          "order_id": "ORD004",
+          "location": { "latitude": 55.7555, "longitude": 48.7465 },
+          "stop_type": "delivery",
+          "sequence_number": 2,
+          "service_duration_minutes": 3
+        }
+      ]
     }
   ],
   "distance_matrix": [
-    {
-      "from_id": "WH_PYATEROCHKA_INNOPOLIS",
-      "to_id": "ORD001",
-      "distance": 0.5
-    },
-    {
-      "from_id": "WH_PYATEROCHKA_INNOPOLIS",
-      "to_id": "ORD002",
-      "distance": 0.3
-    },
-    {
-      "from_id": "WH_PYATEROCHKA_INNOPOLIS",
-      "to_id": "ORD005",
-      "distance": 0.4
-    },
-    {
-      "from_id": "WH_PEREKRESTOK_INNOPOLIS",
-      "to_id": "ORD003",
-      "distance": 0.6
-    },
-    {
-      "from_id": "WH_PEREKRESTOK_INNOPOLIS",
-      "to_id": "ORD004",
-      "distance": 0.7
-    },
-    {
-      "from_id": "ORD001",
-      "to_id": "ORD002",
-      "distance": 0.8
-    },
-    {
-      "from_id": "ORD002",
-      "to_id": "ORD005",
-      "distance": 0.5
-    },
-    {
-      "from_id": "ORD003",
-      "to_id": "ORD004",
-      "distance": 0.9
-    },
-    {
-      "from_id": "WH_PYATEROCHKA_INNOPOLIS",
-      "to_id": "WH_PEREKRESTOK_INNOPOLIS",
-      "distance": 1.2
-    }
+    { "from_id": "WH_PYATEROCHKA_INNOPOLIS", "to_id": "ORD001", "distance": 0.5 },
+    { "from_id": "WH_PYATEROCHKA_INNOPOLIS", "to_id": "ORD002", "distance": 0.3 },
+    { "from_id": "WH_PYATEROCHKA_INNOPOLIS", "to_id": "ORD005", "distance": 0.4 },
+    { "from_id": "WH_PEREKRESTOK_INNOPOLIS", "to_id": "ORD003", "distance": 0.6 },
+    { "from_id": "WH_PEREKRESTOK_INNOPOLIS", "to_id": "ORD004", "distance": 0.7 },
+    { "from_id": "ORD001", "to_id": "ORD002", "distance": 0.8 },
+    { "from_id": "ORD002", "to_id": "ORD005", "distance": 0.5 },
+    { "from_id": "ORD003", "to_id": "ORD004", "distance": 0.9 },
+    { "from_id": "WH_PYATEROCHKA_INNOPOLIS", "to_id": "WH_PEREKRESTOK_INNOPOLIS", "distance": 1.2 }
   ],
   "payment_config": {
-    "rate_per_km": {
-      "car": 60.0,
-      "moped": 45.0,
-      "foot": 25.0
-    },
-    "hourly_rate": {
-      "car": 400.0,
-      "moped": 300.0,
-      "foot": 200.0
-    },
+    "rate_per_km": { "car": 60.0, "moped": 45.0, "foot": 25.0 },
+    "hourly_rate": { "car": 400.0, "moped": 300.0, "foot": 200.0 },
     "window_bonus": 150.0,
     "base_fee": 50.0,
-    "affiliation_multipliers": {
-      "shift": 1.0,
-      "exchange": 1.2,
-      "3pl": 0.9
-    }
+    "affiliation_multipliers": { "shift": 1.0, "exchange": 1.2, "3pl": 0.9 }
   }
 }
