@@ -7,6 +7,15 @@
   <img src="assets/logo.png" alt="Project Logo" width="200"/>
 </div>
 
+## About the Project
+Managing retail delivery logistics involves complex mathematical routing and precise cost calculations. Current systems often struggle with inefficient route validation, leading to financial losses in courier payouts. 
+
+Built for the Industrial track, this project addresses this gap by providing an automated VRP (Vehicle Routing Problem) simulator. Our solution evaluates delivery efficiency against a baseline using advanced algorithms to provide actionable financial and logistical analytics.
+
+The system is divided into two core components:
+1. **Clustering Module:** Automates the optimal grouping of delivery orders using DBSCAN and Evolutionary algorithms.
+2. **Simulation Module:** Validates VRP solutions and precisely calculates courier compensation based on simulated outcomes.
+
 ## Dashboard Preview
 
 <!-- Dashboard Screenshot Placeholder -->
@@ -18,14 +27,6 @@
 <div align="center">
   <img src="assets/simulation_metrics.png" alt="Simulation Metrics" width="800"/>
 </div>
-
-## Architecture
-
-The system consists of three main components:
-
-1. **Clustering Module** (`evolutionary_algorithm/`): Groups orders into optimal delivery routes using evolutionary algorithms
-2. **Simulation Engine** (`simulator/`): Simulates delivery operations with realistic constraints and events
-3. **Frontend Dashboard** (`frontend/`): React-based web interface for visualization and analysis
 
 ## Quick Start with Docker
 
@@ -48,6 +49,37 @@ To stop the services:
 ```bash
 docker compose down
 ```
+
+## Development Roadmap
+
+**MVP 0: Core Architecture & Data Ingestion (Current Scope)**
+* Parsing and ingestion of raw simulation datasets.
+* Initial cluster generation using DBSCAN.
+* Implementation of an Evolutionary algorithm for optimal cluster configuration.
+* Structured output generation of final clustering results.
+* Foundational system flow with basic validation placeholders and data-reading tests.
+
+**MVP 1: Functional Validation**
+* Full implementation of VRP constraint validation logic.
+* Comprehensive unit and integration testing pipelines for validation verdicts.
+
+**MVP 2: Analytics & Refinement**
+* Refinement of core simulation mechanics.
+* Introduction of logistics analytics, specifically courier payment calculations.
+* Integration testing for analytical outputs.
+
+**Out of Scope (Postponed)**
+* Clarke-Wright algorithm for baseline initial splitting.
+* Destroy & Repair algorithms for advanced local optimization.
+* Integration with external customer services.
+
+## Technical Stack
+* **Python:** Core backend language for rapid prototyping and robust logic.
+* **NumPy:** C++ backed processing for high-speed mathematical array operations crucial to VRP calculations.
+* **scikit-learn:** Reliable pre-built algorithms (DBSCAN) and mathematical metrics.
+* **Pandas:** Efficient manipulation and parsing of initial raw datasets.
+* **Pydantic:** Strict object creation and data validation within the simulation module.
+* **pytest:** Primary framework for all unit and integration testing.
 
 ## Manual Installation
 
@@ -162,17 +194,3 @@ The simulation expects a JSON file with the following structure:
 ```
 
 See `simulator/input_schema.json` for the complete schema definition and `simulator/test_data_innopolis.json` for an example.
-
-## Testing
-
-Run the test suite:
-
-```bash
-cd simulator
-
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=simulator --cov-report=html
-```
