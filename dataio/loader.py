@@ -22,7 +22,8 @@ def resolve_data_dir(base_dir: Path) -> Path:
 def load_task_contexts(data_dir: Path) -> list[TaskContext]:
     tasks_orders = load_all_orders(str(data_dir / "orders.csv"))
     tasks_warehouses = load_all_warehouses(str(data_dir / "warehouses.csv"))
-    speeds, max_payloads = load_transport_constraints(str(data_dir / "transport_types.csv"))
+    speeds, max_payloads, fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee\
+        = load_transport_constraints(str(data_dir / "transport_types.csv"))
 
     constraints = ConstraintData(
         max_order_count=5,

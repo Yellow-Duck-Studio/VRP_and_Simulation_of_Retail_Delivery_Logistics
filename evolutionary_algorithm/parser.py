@@ -40,14 +40,29 @@ def load_all_warehouses(filepath: str) -> Dict[str, Dict[int, Tuple[float, float
     return tasks_warehouses
 
 
-def load_transport_constraints(filepath: str) -> Tuple[Dict[str, float], Dict[str, float]]:
+def load_transport_constraints(filepath: str) -> Tuple[
+    Dict[str, float],
+    Dict[str, float],
+    Dict[str, float],
+    Dict[str, float],
+    Dict[str, float],
+    Dict[str, float]
+]:
     """Loads speed and payload constraints. (These are universal, not task-specific)"""
     speeds = {}
     payloads = {}
+    fixed_fee = {}
+    per_km_fee = {}
+    per_order_fee = {}
+    per_kg_min_fee = {}
     with open(filepath, mode='r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
             code = row['code']
             speeds[code] = float(row['approx_speed_kmh'])
             payloads[code] = float(row['max_payload_kg'])
-    return speeds, payloads
+            fixed_fee[code] = float(row['fixed_fee'])
+            per_km_fee[code] = float(row['per_km_fee'])
+            per_order_fee[code] = float(row['per_order_fee'])
+            per_kg_min_fee[code] = float(row['per_kg_min_fee'])
+    return speeds, payloads, fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee

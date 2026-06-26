@@ -3,7 +3,8 @@ from evolutionary_algorithm.parser import load_all_orders, load_all_warehouses, 
 from evolutionary_algorithm.domain import Constraint, Algorithms
 from evolutionary_algorithm.algorithm import run_evolutionary_clustering, Algorithms
 import argparse
-#
+
+
 def main():
 
     parser = argparse.ArgumentParser()
@@ -19,7 +20,8 @@ def main():
     # 1. Load data automatically grouped by task_id
     tasks_orders = load_all_orders('data/orders.csv')
     tasks_warehouses = load_all_warehouses('data/warehouses.csv')
-    speeds, max_payloads = load_transport_constraints('data/transport_types.csv')
+    speeds, max_payloads, fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee\
+        = load_transport_constraints('data/transport_types.csv')
 
     # Define universal constraints for all tasks
     constraints = Constraint(
