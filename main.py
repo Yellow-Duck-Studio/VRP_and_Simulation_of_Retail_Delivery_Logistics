@@ -2,7 +2,7 @@ from evolutionary_algorithm.parser import load_all_orders, load_all_warehouses, 
 from evolutionary_algorithm.domain import Constraint, Algorithms
 from evolutionary_algorithm.algorithm import run_evolutionary_clustering
 from clusterization_logger import save_clusterizations
-from clusterization_metrics import print_archive_stats
+from stats.clusterization_metrics import print_archive_stats
 import argparse
 
 

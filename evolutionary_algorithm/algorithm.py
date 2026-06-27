@@ -218,7 +218,7 @@ def mutate(
     # Give the intelligent LNS operator a good chance of being selected
     mutation_type = random.choices(
         ['swap', 'detach', 'merge', 'split', 'destroy_repair'],
-        weights=[0.2, 0.15, 0.15, 0.1, 0.4]  # 40% chance for Destroy & Repair
+        weights=[0.25, 0.20, 0.15, 0.20, 0.20]
     )[0]
 
     if mutation_type == 'swap':
@@ -345,12 +345,12 @@ def run_evolutionary_clustering(
             if ind.is_valid:
                 valid_clusterizations_archive.add(ind.get_trip_sets())
 
-        next_population = population[:10]  # Elitism: keep top 10 best
+        next_population = population[:2]  # Elitism: keep top 2 best
 
         while len(next_population) < population_size:
             # Tournament selection
-            p1 = min(random.sample(population[:25], 2), key=lambda x: x.fitness_score)
-            p2 = min(random.sample(population[:25], 2), key=lambda x: x.fitness_score)
+            p1 = min(random.sample(population, 3), key=lambda x: x.fitness_score)
+            p2 = min(random.sample(population, 3), key=lambda x: x.fitness_score)
 
             child = crossover(p1, p2)
 
