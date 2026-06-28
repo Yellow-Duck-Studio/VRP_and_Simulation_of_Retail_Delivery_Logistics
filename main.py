@@ -1,9 +1,14 @@
 from evolutionary_algorithm.parser import load_all_orders, load_all_warehouses, load_transport_constraints
 from evolutionary_algorithm.domain import Constraint, Algorithms
 from evolutionary_algorithm.algorithm import run_evolutionary_clustering
+from evolutionary_algorithm.fitness_registry import resolve_fitness_config
 from clusterization_logger import save_clusterizations
+from experiments.publish import publish_algorithm_run
+from experiments.runner import run_experiment_suite
+from experiments.types import ExperimentConfig
 from stats.clusterization_metrics import print_archive_stats
 import argparse
+from pathlib import Path
 
 
 def _build_fee_table(fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee) -> dict:
@@ -22,12 +27,65 @@ def _build_fee_table(fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee) -> di
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "algorithm",
-        type=lambda a: Algorithms[a.upper()],
-        choices=list(Algorithms),
-        help="Choose an algorithm to start with"
+        "target",
+        nargs="?",
+        help="Algorithm for a legacy single run, or one of: experiment, publish",
     )
+    parser.add_argument("--algorithms", nargs="+")
+    parser.add_argument("--execution-mode", default=None, choices=["standalone", "evolutionary"])
+    parser.add_argument("--fitness-version", default="business_v1")
+    parser.add_argument("--label", default="manual_run")
+    parser.add_argument("--generations", type=int, default=500)
+    parser.add_argument("--population-size", type=int, default=50)
+    parser.add_argument("--run-id")
+    parser.add_argument("--algorithm")
     args = parser.parse_args()
+
+    data_dir = Path("data")
+
+    if args.target == "experiment":
+        if not args.algorithms:
+            parser.error("--algorithms is required for experiment mode.")
+        manifest = run_experiment_suite(
+            ExperimentConfig(
+                algorithms=args.algorithms,
+                execution_mode=args.execution_mode or "standalone",
+                fitness_version=args.fitness_version,
+                generations=args.generations,
+                population_size=args.population_size,
+                label=args.label,
+            ),
+            data_dir=data_dir,
+            runs_dir=data_dir / "runs",
+        )
+        print(f"Experiment run created: {manifest.run_id}")
+        print(f"Leaderboard: {data_dir / 'runs' / manifest.run_id / 'leaderboard.csv'}")
+        return
+
+    if args.target == "publish":
+        if not args.run_id or not args.algorithm:
+            parser.error("--run-id and --algorithm are required for publish mode.")
+        target_json, target_csv, submission_path = publish_algorithm_run(
+            run_root=data_dir / "runs" / args.run_id,
+            algorithm_name=args.algorithm,
+            data_dir=data_dir,
+        )
+        print("Published run successfully:")
+        print(f"  JSON: {target_json}")
+        print(f"  CSV:  {target_csv}")
+        print(f"  Submission: {submission_path}")
+        return
+
+    if args.target is None:
+        parser.error("Provide an algorithm for a single run or use 'experiment'/'publish'.")
+
+    try:
+        selected_algorithm = Algorithms[args.target.upper()]
+    except KeyError as error:
+        raise SystemExit(f"Unknown target '{args.target}'. Use an algorithm name or 'experiment'/'publish'.") from error
+
+    execution_mode = args.execution_mode or "evolutionary"
+
     print("Loading comprehensive datasets...")
 
     tasks_orders     = load_all_orders('data/orders.csv')
@@ -54,14 +112,34 @@ def main():
         isolated_warehouses = tasks_warehouses.get(task_id, {})
         print(f"Loaded {len(isolated_orders)} orders across {len(isolated_warehouses)} warehouses.")
 
-        valid_individuals = run_evolutionary_clustering(
-            algorithm=args.algorithm,
-            orders=isolated_orders,
-            warehouses_dict=isolated_warehouses,
-            constraints=constraints,
-            generations=500,
-            population_size=50,
-        )
+        if execution_mode == "standalone":
+            from experiments.standalone import run_standalone_algorithm
+
+            reverse_registry = {
+                Algorithms.DBSCAN: "dbscan",
+                Algorithms.SWEEP: "sweep",
+                Algorithms.CLWR: "clarke_wright",
+                Algorithms.DSTR: "destroy_repair",
+                Algorithms.RND: "random",
+            }
+            valid_individuals = run_standalone_algorithm(
+                algorithm_name=reverse_registry[selected_algorithm],
+                orders=isolated_orders,
+                warehouses_dict=isolated_warehouses,
+                constraints=constraints,
+                population_size=args.population_size,
+                fitness_config=resolve_fitness_config(args.fitness_version),
+            )
+        else:
+            valid_individuals = run_evolutionary_clustering(
+                algorithm=selected_algorithm,
+                orders=isolated_orders,
+                warehouses_dict=isolated_warehouses,
+                constraints=constraints,
+                generations=args.generations,
+                population_size=args.population_size,
+                fitness_config=resolve_fitness_config(args.fitness_version),
+            )
 
         master_archive[f"task_{task_id}"] = valid_individuals
         print(f"Successfully archived {len(valid_individuals)} unique combinations.")
