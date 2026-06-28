@@ -1,7 +1,8 @@
 import math
 from datetime import timedelta
 from typing import Dict, List, Tuple
-from evolutionary_algorithm.domain import Individual, Order, Constraint
+from evolutionary_algorithm.domain import Individual, Order, Constraint, Economics
+
 
 
 # --- 1. Standard Distance Metrics ---
@@ -114,7 +115,94 @@ def evaluate_cluster_direction(wh_lat: float, wh_lon: float, trip_orders: List[O
 
 # --- 4. Main Fitness Evaluation ---
 
-def evaluate_fitness(individual: Individual, orders: Dict[int, Order], constraints: Constraint,
+def evaluate_fitness(individual: Individual, orders: Dict[int, Order],
+                     constraints: Constraint, warehouses: Dict[int, Tuple[float, float]],
+                     econ: Economics) -> Individual:
+    """
+    Calculates individual fitness score expressed in real money (currency units).
+    Combines direct logistics costs with financial risks of SLA violations.
+    """
+    total_cost_rub = 0.0
+    is_valid = True
+    trip_intervals: List[Tuple[float, float]] = []
+
+    for trip in individual.trips.values():
+        if not trip.order_ids:
+            continue
+
+        trip_orders = [orders[oid] for oid in trip.order_ids]
+
+        # 1. Base courier fees
+        trip_cost = econ.fixed_fee + (len(trip_orders) * econ.per_order_fee)
+
+        # 2. Hard constraints check (Order count & Weight capacity)
+        if len(trip_orders) > constraints.max_order_count:
+            trip_cost += econ.invalid_route_penalty
+            is_valid = False
+
+        total_weight = sum(o.total_mass_kg for o in trip_orders)
+        max_allowed_weight = constraints.max_weight_per_transport[trip.transport_type]
+        if total_weight > max_allowed_weight:
+            trip_cost += econ.invalid_route_penalty
+            is_valid = False
+
+        # 3. Route & Time simulation setup
+        trip_orders.sort(key=lambda x: x.delivery_deadline_at)
+        current_time = max(o.pickup_ready_at for o in trip_orders)
+        trip_start_timestamp = current_time.timestamp()
+
+        speed_kmh = constraints.speeds_kmh[trip.transport_type]
+        wh_lat, wh_lon = warehouses[trip.warehouse_id]
+        current_lat, current_lon = wh_lat, wh_lon
+
+        current_load_kg = total_weight
+        trip_kg_min = 0.0
+        trip_distance_km = 0.0
+
+        # 4. Shape penalty (Adds up to 20% to distance cost for bad routing geometry)
+        cluster_spread = evaluate_cluster_direction(wh_lat, wh_lon, trip_orders)
+        direction_multiplier = 1.0 + (cluster_spread * 0.2)
+
+        # 5. Core trip simulation loop
+        for order in trip_orders:
+            dist_km = haversine_distance(current_lat, current_lon, order.lat, order.lon)
+            trip_distance_km += dist_km
+
+            travel_time_hours = dist_km / speed_kmh
+            travel_time_mins = travel_time_hours * 60.0
+
+            # Laboratory metrics (mass-time accumulation)
+            trip_kg_min += current_load_kg * travel_time_mins
+            current_time += timedelta(hours=travel_time_hours)
+
+            # SLA Deadline verification
+            time_diff_seconds = (current_time - order.delivery_deadline_at).total_seconds()
+            if time_diff_seconds > 0:
+                late_mins = time_diff_seconds / 60.0
+                trip_cost += late_mins * econ.sla_penalty_per_min
+                is_valid = False
+
+                # Offload current order weight
+            current_load_kg -= order.total_mass_kg
+            current_lat, current_lon = order.lat, order.lon
+
+        trip_end_timestamp = current_time.timestamp()
+        trip_intervals.append((trip_start_timestamp, trip_end_timestamp))
+
+        # 6. Aggregate trip costs
+        trip_cost += (trip_distance_km * econ.per_km_fee * direction_multiplier)
+        trip_cost += (trip_kg_min * econ.per_kg_min_fee)
+        total_cost_rub += trip_cost
+
+    # 7. Global warehouse synchronization penalty
+    sync_penalty_ratio = evaluate_clusterization_iut(trip_intervals, iut_weight=1.0)
+    total_cost_rub += sync_penalty_ratio * econ.warehouse_sync_cost
+
+    individual.fitness_score = total_cost_rub
+    individual.is_valid = is_valid
+    return individual
+
+def evaluate_fitness_outdated(individual: Individual, orders: Dict[int, Order], constraints: Constraint,
                      warehouses: Dict[int, Tuple[float, float]]) -> Individual:
     """
     Calculates fitness based on time, penalties, IUT, fleet size, AND directional cohesion.
