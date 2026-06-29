@@ -40,6 +40,13 @@ class Individual:
     trips: Dict[int, Trip] = field(default_factory=dict)
     fitness_score: float = float('inf')
     is_valid: bool = False
+    invalid_reasons: Dict[str, bool] = field(
+        default_factory=lambda: {
+            "capacity": False,
+            "mass": False,
+            "sla": False,
+        }
+    )
 
     def get_trip_sets(self) -> frozenset:
         """Used to uniquely hash the state of this clusterization for the Archive."""

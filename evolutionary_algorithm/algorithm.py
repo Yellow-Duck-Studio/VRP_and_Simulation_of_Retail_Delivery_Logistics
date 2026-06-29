@@ -1,9 +1,10 @@
-from typing import List, Dict, Tuple, Set
+from typing import List, Dict, Tuple
 
 from evolutionary_algorithm.domain import Individual, Trip, Order, Constraint
 import random
 
 from evolutionary_algorithm.evaluation import evaluate_fitness
+from evolutionary_algorithm.fitness_registry import FitnessConfig
 
 # Algorithms
 from evolutionary_algorithm.domain import Algorithms
@@ -23,7 +24,11 @@ def _copy_individual(individual: Individual) -> Individual:
             order_ids=list(v.order_ids),
         )
         for k, v in individual.trips.items()
-    })
+    },
+        fitness_score=individual.fitness_score,
+        is_valid=individual.is_valid,
+        invalid_reasons=dict(individual.invalid_reasons),
+    )
 
 
 def _active_trips(individual: Individual) -> List[Trip]:
@@ -295,10 +300,11 @@ def run_evolutionary_clustering(
         warehouses_dict: Dict[int, Tuple[float, float]],  # warehouse_id -> (lat, lon)
         constraints: Constraint,
         generations: int = 1000,
-        population_size: int = 50
-) -> Set[frozenset]:
+        population_size: int = 50,
+        fitness_config: FitnessConfig | None = None,
+) -> List[Individual]:
     orders_dict = {o.order_id: o for o in orders}
-    valid_clusterizations_archive: Set[frozenset] = set()
+    valid_clusterizations_archive: dict[frozenset, Individual] = {}
     # 1. Initializing population based on chosen algorithm
 
     if algorithm == Algorithms.DBSCAN:
@@ -333,7 +339,7 @@ def run_evolutionary_clustering(
         raise ValueError(f"Unknown algorithm: {algorithm}")
 
     for ind in population:
-        evaluate_fitness(ind, orders_dict, constraints, warehouses_dict)
+        evaluate_fitness(ind, orders_dict, constraints, warehouses_dict, fitness_config)
 
 # 2. Main Evolutionary Loop
     for gen in range(generations):
@@ -343,7 +349,9 @@ def run_evolutionary_clustering(
         # Archive valid solutions to fulfill the "thousands of combinations" requirement
         for ind in population:
             if ind.is_valid:
-                valid_clusterizations_archive.add(ind.get_trip_sets())
+                signature = ind.get_trip_sets()
+                if signature not in valid_clusterizations_archive:
+                    valid_clusterizations_archive[signature] = _copy_individual(ind)
 
         next_population = population[:2]  # Elitism: keep top 2 best
 
@@ -357,7 +365,7 @@ def run_evolutionary_clustering(
             if random.random() < 0.5:  # 50% mutation rate
                 child = mutate(child, orders_dict, warehouses_dict, constraints)
 
-            evaluate_fitness(child, orders_dict, constraints, warehouses_dict)
+            evaluate_fitness(child, orders_dict, constraints, warehouses_dict, fitness_config)
             next_population.append(child)
 
         population = next_population
@@ -366,4 +374,4 @@ def run_evolutionary_clustering(
             print(
                 f"Gen {gen} | Best Fitness: {population[0].fitness_score:.2f} | Valid Archieved: {len(valid_clusterizations_archive)}")
 
-    return valid_clusterizations_archive
+    return sorted(valid_clusterizations_archive.values(), key=lambda item: item.fitness_score)
