@@ -17,6 +17,14 @@ export interface OrderInfo {
   weight: number;
 }
 
+type ClusteringVariant = number[][];
+
+type TaskClusters = ClusteringVariant[];
+
+type AlgorithmResults = Record<string, TaskClusters>;
+
+type AllResults = Record<string, AlgorithmResults>;
+
 // IMPORTANT: order_id in orders.csv is unique only WITHIN a single task_id
 // (polygon), not globally. The same order_id appears across many different
 // task_id groups with completely different coordinates. Keying the orders
@@ -120,7 +128,7 @@ export async function loadWarehousesDataset(csvUrl: string = `${DATA_BASE_URL}/d
   }
 }
 
-export async function runClustering(algorithms: string[]): Promise<Record<string, never>> {
+export async function runClustering(algorithms: string[]): Promise<AllResults> {
   const response = await fetch(`${API_BASE_URL}/cluster`, {
     method: "POST",
     headers: {
@@ -142,8 +150,8 @@ export interface ClusterProgressEvent {
   algorithm?: string;
   line?: string;
   message?: string;
-  data?: Record<string, never>;
-  results?: Record<string, never>;
+  data?: AlgorithmResults;
+  results?: AllResults;
 }
 
 /**
@@ -155,7 +163,7 @@ export interface ClusterProgressEvent {
 export function runClusteringWithProgress(
   algorithms: string[],
   onEvent: (event: ClusterProgressEvent) => void
-): Promise<Record<string, never>> {
+): Promise<AllResults> {
   return new Promise((resolve, reject) => {
     let settled = false;
     const ws = new WebSocket(`${WS_BASE_URL}/ws/cluster`);
@@ -189,20 +197,8 @@ export function runClusteringWithProgress(
         reject(new Error(data.message || `Clustering failed for ${data.algorithm}`));
       }
     };
-
-    ws.onerror = () => {
-      if (!settled) {
-        settled = true;
-        reject(new Error("WebSocket connection error"));
-      }
-    };
-
-    ws.onclose = () => {
-      if (!settled) {
-        settled = true;
-        reject(new Error("Connection closed before clustering finished"));
-      }
-    };
+    ws.onerror = () => { if (!settled) { settled = true; reject(new Error("WebSocket connection error")); } };
+    ws.onclose = () => { if (!settled) { settled = true; reject(new Error("Connection closed before clustering finished")); } };
   });
 }
 
