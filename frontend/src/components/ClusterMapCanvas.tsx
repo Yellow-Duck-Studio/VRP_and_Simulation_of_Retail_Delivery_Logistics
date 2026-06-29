@@ -12,7 +12,7 @@ import {
 } from "../api.ts";
 import {MapIcon, MinusIcon, PlusIcon,} from '@heroicons/react/24/outline';
 
-interface ClusterMapProps {
+export interface ClusterMapProps {
   clusters: number[][];
   taskId: number | string;
   isRunning?: boolean;

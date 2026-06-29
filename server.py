@@ -7,6 +7,7 @@ import traceback
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 from typing import List
 
@@ -51,6 +52,8 @@ async def run_clustering(request: ClusterRequest):
                 results[alg] = json.load(f)
 
         return results
+    except HTTPException:
+        raise
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -160,7 +163,7 @@ async def run_simulation():
             check=True,
             cwd="simulator"
         )
-        return result.stdout
+        return PlainTextResponse(result.stdout)
     except subprocess.CalledProcessError as e:
         raise HTTPException(status_code=500, detail=e.stderr or e.stdout)
 
