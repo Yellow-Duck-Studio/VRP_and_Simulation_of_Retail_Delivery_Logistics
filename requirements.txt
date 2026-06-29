@@ -9,3 +9,4 @@ pandas~=3.0.3
 matplotlib~=3.11.0
 colorcet~=3.2.1
 wsproto~=1.2.0
+httpx~=0.28.1
