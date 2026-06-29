@@ -1,0 +1,84 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [ "main", "ci-cd" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install -r requirements.txt
+          cd simulator && pip install -r requirements.txt
+
+      - name: Run Backend & Simulator Tests
+        run: |
+          pytest tests/ -v
+          cd simulator && pytest
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run Frontend Tests
+        run: |
+          cd frontend
+          npm ci
+          npx vitest run
+
+  deploy:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Create .env file
+        run: |
+          cd frontend && touch .env
+          echo "DB_PASSWORD=${{ secrets.VITE_API_BASE_URL }}" >> .env
+
+      - name: Deploy with Automated Rollback
+        run: |
+          echo "Starting deployment process..."
+          
+          PREV_COMMIT=$(git rev-parse HEAD~1)
+                    
+          docker compose up -d --build
+
+          echo " Waiting 15 seconds for services to stabilize..."
+          sleep 15
+          
+          FAILED=$(docker compose ps --format json | jq -r 'select(.State == "exited" or .State == "restarting" or .State == "dead") | .Name')
+          
+          if [ -n "$FAILED" ]; then
+            echo "CRITICAL: Following containers failed to start: $FAILED"
+            echo "Initiating rollback to commit $PREV_COMMIT..."
+          
+            git checkout $PREV_COMMIT
+          
+            docker compose up -d --build
+          
+            echo "Rollback completed. The system is back to the previous stable state."
+            exit 1
+          else
+            echo "All containers are running healthy."
+            docker image prune -f
+          fi
