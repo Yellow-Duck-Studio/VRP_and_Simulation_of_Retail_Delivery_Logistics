@@ -1,0 +1,249 @@
+{
+  "task_1": [],
+  "task_2": [
+    {
+      "clusterization_id": 1,
+      "fitness_score": 95.36057855670603,
+      "is_valid": true,
+      "clusters": [
+        {
+          "cluster_id": 1,
+          "warehouse_id": 1,
+          "transport_type": "car",
+          "order_ids": [
+            6,
+            8,
+            9,
+            3
+          ]
+        },
+        {
+          "cluster_id": 2,
+          "warehouse_id": 1,
+          "transport_type": "car",
+          "order_ids": [
+            4,
+            2,
+            1,
+            7,
+            5
+          ]
+        },
+        {
+          "cluster_id": 3,
+          "warehouse_id": 2,
+          "transport_type": "car",
+          "order_ids": [
+            16,
+            13,
+            14,
+            11
+          ]
+        },
+        {
+          "cluster_id": 4,
+          "warehouse_id": 2,
+          "transport_type": "car",
+          "order_ids": [
+            15,
+            10,
+            12
+          ]
+        },
+        {
+          "cluster_id": 5,
+          "warehouse_id": 3,
+          "transport_type": "car",
+          "order_ids": [
+            17,
+            22,
+            24,
+            21
+          ]
+        },
+        {
+          "cluster_id": 6,
+          "warehouse_id": 3,
+          "transport_type": "car",
+          "order_ids": [
+            18,
+            25,
+            20,
+            23,
+            19
+          ]
+        },
+        {
+          "cluster_id": 7,
+          "warehouse_id": 4,
+          "transport_type": "car",
+          "order_ids": [
+            26,
+            29,
+            31,
+            30,
+            28
+          ]
+        },
+        {
+          "cluster_id": 8,
+          "warehouse_id": 4,
+          "transport_type": "car",
+          "order_ids": [
+            32,
+            27
+          ]
+        },
+        {
+          "cluster_id": 9,
+          "warehouse_id": 5,
+          "transport_type": "car",
+          "order_ids": [
+            34,
+            38,
+            40,
+            35
+          ]
+        },
+        {
+          "cluster_id": 10,
+          "warehouse_id": 5,
+          "transport_type": "car",
+          "order_ids": [
+            36,
+            41,
+            39,
+            37,
+            33
+          ]
+        }
+      ]
+    },
+    {
+      "clusterization_id": 2,
+      "fitness_score": 96.3420416419925,
+      "is_valid": true,
+      "clusters": [
+        {
+          "cluster_id": 1,
+          "warehouse_id": 1,
+          "transport_type": "car",
+          "order_ids": [
+            6,
+            8,
+            9,
+            3
+          ]
+        },
+        {
+          "cluster_id": 2,
+          "warehouse_id": 1,
+          "transport_type": "car",
+          "order_ids": [
+            4,
+            2,
+            1,
+            7,
+            5
+          ]
+        },
+        {
+          "cluster_id": 3,
+          "warehouse_id": 2,
+          "transport_type": "car",
+          "order_ids": [
+            16,
+            13,
+            14,
+            11
+          ]
+        },
+        {
+          "cluster_id": 4,
+          "warehouse_id": 2,
+          "transport_type": "car",
+          "order_ids": [
+            15,
+            10,
+            12
+          ]
+        },
+        {
+          "cluster_id": 5,
+          "warehouse_id": 3,
+          "transport_type": "car",
+          "order_ids": [
+            17,
+            22,
+            24,
+            21
+          ]
+        },
+        {
+          "cluster_id": 6,
+          "warehouse_id": 3,
+          "transport_type": "car",
+          "order_ids": [
+            18,
+            25,
+            20,
+            23,
+            19
+          ]
+        },
+        {
+          "cluster_id": 7,
+          "warehouse_id": 4,
+          "transport_type": "car",
+          "order_ids": [
+            26,
+            29,
+            31,
+            30,
+            28
+          ]
+        },
+        {
+          "cluster_id": 8,
+          "warehouse_id": 4,
+          "transport_type": "car",
+          "order_ids": [
+            32,
+            27
+          ]
+        },
+        {
+          "cluster_id": 9,
+          "warehouse_id": 5,
+          "transport_type": "car",
+          "order_ids": [
+            34,
+            38,
+            40,
+            35,
+            39
+          ]
+        },
+        {
+          "cluster_id": 10,
+          "warehouse_id": 5,
+          "transport_type": "car",
+          "order_ids": [
+            36,
+            37,
+            33,
+            41
+          ]
+        }
+      ]
+    }
+  ],
+  "task_3": [],
+  "task_4": [],
+  "task_5": [],
+  "task_6": [],
+  "task_7": [],
+  "task_8": [],
+  "task_9": [],
+  "task_10": []
+}
