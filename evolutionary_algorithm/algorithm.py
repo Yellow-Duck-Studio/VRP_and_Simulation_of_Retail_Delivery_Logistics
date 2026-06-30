@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from evolutionary_algorithm.domain import Individual, Trip, Order, Constraint
 import random
@@ -302,7 +302,20 @@ def run_evolutionary_clustering(
         generations: int = 1000,
         population_size: int = 50,
         fitness_config: FitnessConfig | None = None,
+        on_generation: Optional[Callable[[int, float, int], None]] = None,
 ) -> List[Individual]:
+    """
+    Runs the evolutionary clustering loop.
+
+    `on_generation`, if provided, is called once per generation as
+    `on_generation(gen, best_fitness_score, archive_size)`, *after* the
+    archive has been updated for that generation. This lets callers
+    (e.g. benchmarking scripts) track the progression of
+    `valid_clusterizations_archive` over time without having to parse
+    stdout - useful for confirming the archive is actively collecting
+    valid permutations, generation by generation, rather than just
+    spot-checking the printed log every 100 generations.
+    """
     orders_dict = {o.order_id: o for o in orders}
     valid_clusterizations_archive: dict[frozenset, Individual] = {}
     # 1. Initializing population based on chosen algorithm
@@ -352,6 +365,9 @@ def run_evolutionary_clustering(
                 signature = ind.get_trip_sets()
                 if signature not in valid_clusterizations_archive:
                     valid_clusterizations_archive[signature] = _copy_individual(ind)
+
+        if on_generation is not None:
+            on_generation(gen, population[0].fitness_score, len(valid_clusterizations_archive))
 
         next_population = population[:2]  # Elitism: keep top 2 best
 
