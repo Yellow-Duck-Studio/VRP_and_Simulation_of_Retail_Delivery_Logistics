@@ -2,7 +2,7 @@ name: CI/CD
 
 on:
   push:
-    branches: [ "main", "ci-cd" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
 
@@ -39,9 +39,26 @@ jobs:
           npm ci
           npx vitest run
 
+      - name: Build
+        run: |
+          docker compose up -d --build
+
+          echo " Waiting 5 seconds for services to stabilize..."
+          sleep 5
+          
+          FAILED=$(docker compose ps --format json | jq -r 'select(.State == "exited" or .State == "restarting" or .State == "dead") | .Name')
+          if [ -n "$FAILED" ]; then
+            echo "Following containers failed to start: $FAILED"
+            exit 1
+          else
+            echo "All containers are running healthy."
+            docker image prune -f
+            docker compose down
+          fi
+
   deploy:
     needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'push' && github.ref == 'refs/heads/ci-cd'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: self-hosted
 
     steps:
@@ -64,7 +81,7 @@ jobs:
           docker compose up -d --build
 
           echo " Waiting 15 seconds for services to stabilize..."
-          sleep 15
+          sleep 5
           
           FAILED=$(docker compose ps --format json | jq -r 'select(.State == "exited" or .State == "restarting" or .State == "dead") | .Name')
           
@@ -76,7 +93,7 @@ jobs:
           
             docker compose up -d --build
           
-            echo "Rollback completed. The system is back to the previous stable state."
+            echo "Rollback completed. The system is back to the previous state."
             exit 1
           else
             echo "All containers are running healthy."
