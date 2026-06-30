@@ -43,17 +43,19 @@ jobs:
         run: |
           docker compose up -d --build
 
-          echo " Waiting 5 seconds for services to stabilize..."
-          sleep 5
+          echo " Waiting 10 seconds for services to startup..."
+          sleep 10
           
           FAILED=$(docker compose ps --format json | jq -r 'select(.State == "exited" or .State == "restarting" or .State == "dead") | .Name')
+          
+          docker image prune -f
+          docker compose down
+          
           if [ -n "$FAILED" ]; then
-            echo "Following containers failed to start: $FAILED"
+            echo "\nFollowing containers failed to start: $FAILED"
             exit 1
           else
-            echo "All containers are running healthy."
-            docker image prune -f
-            docker compose down
+            echo "\nAll containers are running healthy."
           fi
 
   deploy:
@@ -80,8 +82,8 @@ jobs:
                     
           docker compose up -d --build
 
-          echo " Waiting 15 seconds for services to stabilize..."
-          sleep 5
+          echo " Waiting 10 seconds for services to startup..."
+          sleep 10
           
           FAILED=$(docker compose ps --format json | jq -r 'select(.State == "exited" or .State == "restarting" or .State == "dead") | .Name')
           
