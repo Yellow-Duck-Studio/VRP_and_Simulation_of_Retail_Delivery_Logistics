@@ -541,10 +541,13 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
                 <rect x="-8" y="-5" width="3" height="10" rx="1" fill="#1e293b" opacity="0.5" />
                 <animateMotion dur="12s" begin={car.begin} repeatCount="indefinite" path={idlePath} rotate="auto" />
               </g>
-            ))}
-
+            ))
+            }
             <text x={VIEW_BOX_WIDTH / 2} y={VIEW_BOX_HEIGHT / 2} textAnchor="middle" fill="#475569" fontSize="26" fontWeight="bold">
               Idle Fleet Mileage: {virtualDistance} km
+            </text>
+            <text x={VIEW_BOX_WIDTH / 2} y={VIEW_BOX_HEIGHT / 1.88} textAnchor="middle" fill="#939eab" fontSize="10">
+              Here you can beat the world record
             </text>
             {!dataLoaded && (
               <text x={VIEW_BOX_WIDTH / 2} y={VIEW_BOX_HEIGHT / 2 + 30} textAnchor="middle" fill="#94a3b8" fontSize="14">
