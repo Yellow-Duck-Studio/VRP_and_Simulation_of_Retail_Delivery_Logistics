@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+
 CSV_FIELDS = [
     "task_id",
     "warehouse_id",
@@ -33,12 +34,12 @@ def _iter_csv_rows(master_archive: Dict[str, List[Any]]):
                     continue
                 for order_id in trip.order_ids:
                     yield {
-                        "task_id": task_id,
-                        "warehouse_id": trip.warehouse_id,
+                        "task_id":           task_id,
+                        "warehouse_id":      trip.warehouse_id,
                         "clusterization_id": clust_idx,
-                        "cluster_id": trip.trip_id,
-                        "order_id": order_id,
-                        "transport_type": trip.transport_type,
+                        "cluster_id":        trip.trip_id,
+                        "order_id":          order_id,
+                        "transport_type":    trip.transport_type,
                     }
 
 
@@ -49,14 +50,14 @@ def _archive_to_serializable(master_archive: Dict[str, List[Any]]) -> dict:
         result[task_key] = [
             {
                 "clusterization_id": clust_idx,
-                "fitness_score": ind.fitness_score,
-                "is_valid": ind.is_valid,
+                "fitness_score":     ind.fitness_score,
+                "is_valid":          ind.is_valid,
                 "clusters": [
                     {
-                        "cluster_id": trip.trip_id,
-                        "warehouse_id": trip.warehouse_id,
+                        "cluster_id":     trip.trip_id,
+                        "warehouse_id":   trip.warehouse_id,
                         "transport_type": trip.transport_type,
-                        "order_ids": list(trip.order_ids),
+                        "order_ids":      list(trip.order_ids),
                     }
                     for trip in ind.trips.values()
                     if trip.order_ids
@@ -68,8 +69,8 @@ def _archive_to_serializable(master_archive: Dict[str, List[Any]]) -> dict:
 
 
 def save_clusterizations(
-        master_archive: Dict[str, List[Any]],
-        base_path: str,
+    master_archive: Dict[str, List[Any]],
+    base_path: str,
 ) -> tuple:
     """
     Сохраняет master_archive в JSON и CSV.

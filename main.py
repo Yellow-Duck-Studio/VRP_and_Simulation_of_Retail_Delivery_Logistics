@@ -10,6 +10,19 @@ def _build_fee_table(fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee) -> di
     transport_types = set(fixed_fee) | set(per_km_fee) | set(per_order_fee) | set(per_kg_min_fee)
     return {
         t: {
+            "fixed_fee":      fixed_fee.get(t, 0.0),
+            "per_km_fee":     per_km_fee.get(t, 0.0),
+            "per_order_fee":  per_order_fee.get(t, 0.0),
+            "per_kg_min_fee": per_kg_min_fee.get(t, 0.0),
+        }
+        for t in transport_types
+    }
+
+
+def _build_fee_table(fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee) -> dict:
+    transport_types = set(fixed_fee) | set(per_km_fee) | set(per_order_fee) | set(per_kg_min_fee)
+    return {
+        t: {
             "fixed_fee": fixed_fee.get(t, 0.0),
             "per_km_fee": per_km_fee.get(t, 0.0),
             "per_order_fee": per_order_fee.get(t, 0.0),
@@ -23,13 +36,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "algorithm",
-        type=lambda a: Algorithms[a.upper()],
-        choices=list(Algorithms),
+        type=lambda a: Algorithms[a.upper()],  # Maps string to Enum member (case-insensitive)
+        choices=list(Algorithms),            # Restricts CLI choices to the Enum members
         help="Choose an algorithm to start with"
     )
     args = parser.parse_args()
     print("Loading comprehensive datasets...")
 
+    # 1. Load data automatically grouped by task_id
     tasks_orders = load_all_orders('data/orders.csv')
     tasks_warehouses = load_all_warehouses('data/warehouses.csv')
     speeds, max_payloads, fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee \
@@ -37,6 +51,7 @@ def main():
 
     fee_table = _build_fee_table(fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee)
 
+    # Define universal constraints for all tasks
     constraints = Constraint(
         max_order_count=5,
         max_weight_per_transport=max_payloads,
@@ -44,14 +59,18 @@ def main():
         transport_distribution={'car': 0.80, 'bike': 0.15, 'foot': 0.05}
     )
 
+    # This will hold the final structured JSON data
     master_archive = {}
 
+    # 2. Iterate through every isolated polygon (task)
     for task_id, isolated_orders in tasks_orders.items():
-        print(f"\n{'=' * 45}")
+        print(f"\n" + "=" * 45)
         print(f" RUNNING EVOLUTION FOR TASK ID: {task_id}")
         print("=" * 45)
 
+        # Fetch the specific warehouses for this task
         isolated_warehouses = tasks_warehouses.get(task_id, {})
+
         print(f"Loaded {len(isolated_orders)} orders across {len(isolated_warehouses)} warehouses.")
 
         valid_individuals = run_evolutionary_clustering(
@@ -59,8 +78,8 @@ def main():
             orders=isolated_orders,
             warehouses_dict=isolated_warehouses,
             constraints=constraints,
-            generations=500,
-            population_size=50,
+            generations=500,  # Increase this for production
+            population_size=50  # Increase this for production
         )
 
         master_archive[f"task_{task_id}"] = valid_individuals
