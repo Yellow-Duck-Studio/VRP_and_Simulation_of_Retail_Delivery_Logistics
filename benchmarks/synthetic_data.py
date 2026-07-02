@@ -21,6 +21,7 @@ Design notes:
   state, so the caller can deterministically `random.seed(42)` right
   before running an algorithm without any "leftover" randomness from
   data generation leaking into the algorithm's own random choices.
+  
 """
 
 from __future__ import annotations

@@ -25,6 +25,7 @@ Run from the project root (same place you'd run `python main.py`):
 
     python -m benchmarks.run_benchmark
     python -m benchmarks.run_benchmark --generations 300 --seed 42
+    
 """
 
 from __future__ import annotations
