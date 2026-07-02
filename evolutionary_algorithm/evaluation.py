@@ -124,7 +124,7 @@ def evaluate_fitness(individual: Individual, orders: Dict[int, Order],
     """
     total_cost_rub = 0.0
     is_valid = True
-    trip_intervals: List[Tuple[float, float]] = []
+    warehouse_trip_intervals: Dict[int, List[Tuple[float, float]]] = {}
 
     for trip in individual.trips.values():
         if not trip.order_ids:
@@ -187,7 +187,7 @@ def evaluate_fitness(individual: Individual, orders: Dict[int, Order],
             current_lat, current_lon = order.lat, order.lon
 
         trip_end_timestamp = current_time.timestamp()
-        trip_intervals.append((trip_start_timestamp, trip_end_timestamp))
+        warehouse_trip_intervals.setdefault(trip.warehouse_id, []).append((trip_start_timestamp, trip_end_timestamp))
 
         # 6. Aggregate trip costs
         trip_cost += (trip_distance_km * econ.per_km_fee * direction_multiplier)
@@ -195,8 +195,10 @@ def evaluate_fitness(individual: Individual, orders: Dict[int, Order],
         total_cost_rub += trip_cost
 
     # 7. Global warehouse synchronization penalty
-    sync_penalty_ratio = evaluate_clusterization_iut(trip_intervals, iut_weight=1.0)
-    total_cost_rub += sync_penalty_ratio * econ.warehouse_sync_cost
+    total_sync_penalty_ratio = 0.0
+    for wh_id, intervals in warehouse_trip_intervals.items():
+        total_sync_penalty_ratio += evaluate_clusterization_iut(intervals, iut_weight=1.0)
+    total_cost_rub += total_sync_penalty_ratio * econ.warehouse_sync_cost
 
     individual.fitness_score = total_cost_rub
     individual.is_valid = is_valid
