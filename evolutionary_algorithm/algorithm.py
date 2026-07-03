@@ -1,9 +1,10 @@
-from typing import List, Dict, Tuple, Set
+from typing import Callable, Dict, List, Optional, Tuple
 
 from evolutionary_algorithm.domain import Individual, Trip, Order, Constraint, Economics
 import random
 
 from evolutionary_algorithm.evaluation import evaluate_fitness
+from evolutionary_algorithm.fitness_registry import FitnessConfig
 
 # Algorithms
 from evolutionary_algorithm.domain import Algorithms
@@ -14,7 +15,6 @@ from sweep_seeding import seed_population as seed_population_sweep
 
 from evolutionary_algorithm.evaluation import haversine_distance, evaluate_cluster_direction
 
-
 def _copy_individual(individual: Individual) -> Individual:
     return Individual(trips={
         k: Trip(
@@ -24,7 +24,11 @@ def _copy_individual(individual: Individual) -> Individual:
             order_ids=list(v.order_ids),
         )
         for k, v in individual.trips.items()
-    })
+    },
+        fitness_score=individual.fitness_score,
+        is_valid=individual.is_valid,
+        invalid_reasons=dict(individual.invalid_reasons),
+    )
 
 
 def _active_trips(individual: Individual) -> List[Trip]:
@@ -123,7 +127,6 @@ def _mutate_split(ind: Individual) -> None:
             order_ids=cluster_orders,
         )
 
-
 def _mutate_destroy_repair(
         ind: Individual,
         orders_dict: Dict[int, Order],
@@ -220,7 +223,7 @@ def mutate(
     # Give the intelligent LNS operator a good chance of being selected
     mutation_type = random.choices(
         ['swap', 'detach', 'merge', 'split', 'destroy_repair'],
-        weights=[0.2, 0.2, 0.25, 0.15, 0.2]  # 20% chance for Destroy & Repair
+        weights=[0.25, 0.20, 0.15, 0.20, 0.20]
     )[0]
 
     if mutation_type == 'swap':
@@ -266,7 +269,6 @@ def crossover(parent1: Individual, parent2: Individual) -> Individual:
 
     return child
 
-
 def init_random_population(orders, constraints, population_size) -> List[Individual]:
     population: List[Individual] = []
     for _ in range(population_size):
@@ -292,16 +294,29 @@ def init_random_population(orders, constraints, population_size) -> List[Individ
         population.append(ind)
     return population
 
-
 def run_evolutionary_clustering(
         algorithm: Algorithms,
         orders: List[Order],
-        warehouses_dict: Dict[int, Tuple[float, float]],
+        warehouses_dict: Dict[int, Tuple[float, float]],  # warehouse_id -> (lat, lon)
         constraints: Constraint,
-        econ: Economics = Economics(),
+        fitness_fn: "FitnessFn",
         generations: int = 1000,
-        population_size: int = 50
+        population_size: int = 50,
+        fitness_config: FitnessConfig | None = None,
+        on_generation: Optional[Callable[[int, float, int], None]] = None,
 ) -> List[Individual]:
+    """
+    Runs the evolutionary clustering loop.
+
+    `on_generation`, if provided, is called once per generation as
+    `on_generation(gen, best_fitness_score, archive_size)`, *after* the
+    archive has been updated for that generation. This lets callers
+    (e.g. benchmarking scripts) track the progression of
+    `valid_clusterizations_archive` over time without having to parse
+    stdout - useful for confirming the archive is actively collecting
+    valid permutations, generation by generation, rather than just
+    spot-checking the printed log every 100 generations.
+    """
     orders_dict = {o.order_id: o for o in orders}
     valid_clusterizations_archive: Dict[frozenset, Individual] = {}
     # 1. Initializing population based on chosen algorithm
@@ -339,29 +354,24 @@ def run_evolutionary_clustering(
         raise ValueError(f"Unknown algorithm: {algorithm}")
 
     for ind in population:
-        evaluate_fitness(ind, orders_dict, constraints, warehouses_dict, econ)
+        fitness_fn(ind, orders_dict, constraints, warehouses_dict)
 
-    # 2. Main Generation Loop
+# 2. Main Evolutionary Loop
     for gen in range(generations):
+        # Sort by fitness (lowest is best)
         population.sort(key=lambda x: x.fitness_score)
 
+        # Archive valid solutions to fulfill the "thousands of combinations" requirement
         for ind in population:
             if ind.is_valid:
-                structure_key = ind.get_trip_sets()
-                # If this layout is new, or we found a cheaper/better way to execute this same layout:
-                if (structure_key not in valid_clusterizations_archive or
-                        ind.fitness_score < valid_clusterizations_archive[structure_key].fitness_score):
-                    # Create a deep copy of the trips using your existing helper
-                    archived_copy = _copy_individual(ind)
-                    # Don't forget to explicitly copy the scalar metrics over!
-                    archived_copy.fitness_score = ind.fitness_score
-                    archived_copy.is_valid = ind.is_valid
+                signature = ind.get_trip_sets()
+                if signature not in valid_clusterizations_archive:
+                    valid_clusterizations_archive[signature] = _copy_individual(ind)
 
-                    valid_clusterizations_archive[structure_key] = archived_copy
+        if on_generation is not None:
+            on_generation(gen, population[0].fitness_score, len(valid_clusterizations_archive))
 
-        # --- 1. ELITISM ---
-        # Keep the top 2 best to ensure we never lose our best found solution
-        next_population = population[:2]
+        next_population = population[:2]  # Elitism: keep top 2 best
 
         # --- 2. RANDOM INJECTIONS (IMMIGRANTS) ---
         # Inject 15% fresh random individuals to maintain genetic diversity
@@ -369,7 +379,7 @@ def run_evolutionary_clustering(
         immigrants = init_random_population(orders, constraints, injection_count)
 
         for ind in immigrants:
-            evaluate_fitness(ind, orders_dict, constraints, warehouses_dict, econ)
+            fitness_fn(ind, orders_dict, constraints, warehouses_dict)
         next_population.extend(immigrants)
 
         # --- 3. REPRODUCTION (CROSSOVER & MUTATION) ---
@@ -384,7 +394,7 @@ def run_evolutionary_clustering(
             if random.random() < 0.6:
                 child = mutate(child, orders_dict, warehouses_dict, constraints)
 
-            evaluate_fitness(child, orders_dict, constraints, warehouses_dict, econ)
+            fitness_fn(ind, orders_dict, constraints, warehouses_dict)
             next_population.append(child)
 
         population = next_population
@@ -392,4 +402,5 @@ def run_evolutionary_clustering(
         if gen % 100 == 0:
             print(
                 f"Gen {gen} | Best Fitness: {population[0].fitness_score:.2f} | Valid Archived: {len(valid_clusterizations_archive)}")
-    return list(valid_clusterizations_archive.values())
+
+    return sorted(valid_clusterizations_archive.values(), key=lambda item: item.fitness_score)

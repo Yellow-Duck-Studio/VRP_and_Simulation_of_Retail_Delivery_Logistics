@@ -4,6 +4,38 @@ from typing import Dict, List, Tuple
 from evolutionary_algorithm.domain import Individual, Order, Constraint, Economics
 
 
+from evolutionary_algorithm.domain import Individual, Order, Constraint
+from evolutionary_algorithm.fitness_registry import FitnessConfig, resolve_fitness_config
+
+
+from functools import partial
+from typing import Callable, Literal
+
+FitnessMode = Literal["time", "economics"]
+
+# Унифицированная сигнатура: (individual, orders, constraints, warehouses) -> Individual
+FitnessFn = Callable[[Individual, Dict[int, Order], Constraint, Dict[int, Tuple[float, float]]], Individual]
+
+def build_fitness_fn(
+    mode: FitnessMode,
+    fitness_config: FitnessConfig | None = None,
+    econ: Economics | None = None,
+) -> FitnessFn:
+    """
+    Собирает единый callable для нужной фитнес-функции, скрывая разницу
+    в сигнатурах evaluate_fitness (использует FitnessConfig) и
+    evaluate_fitness_economics (использует Economics).
+    """
+    if mode == "time":
+        config = fitness_config or resolve_fitness_config()
+        return partial(evaluate_fitness, fitness_config=config)
+
+    elif mode == "economics":
+        economics = econ or Economics()
+        return partial(evaluate_fitness_economics, econ=economics)
+
+    else:
+        raise ValueError(f"Unknown fitness mode: {mode!r}. Expected 'time' or 'economics'.")
 
 # --- 1. Standard Distance Metrics ---
 
@@ -115,7 +147,101 @@ def evaluate_cluster_direction(wh_lat: float, wh_lon: float, trip_orders: List[O
 
 # --- 4. Main Fitness Evaluation ---
 
-def evaluate_fitness(individual: Individual, orders: Dict[int, Order],
+def evaluate_fitness(individual: Individual, orders: Dict[int, Order], constraints: Constraint,
+                     warehouses: Dict[int, Tuple[float, float]],
+                     fitness_config: FitnessConfig | None = None) -> Individual:
+    """
+    Calculates fitness based on time, penalties, IUT, fleet size, AND directional cohesion.
+    """
+    config = fitness_config or resolve_fitness_config()
+    total_time = 0.0
+    penalty = 0.0
+    is_valid = True
+    invalid_reasons = {
+        "capacity": False,
+        "mass": False,
+        "sla": False,
+    }
+
+    trip_intervals: List[Tuple[float, float]] = []
+    active_fleet_size = 0
+
+    # Keep a running total of how "spread out" the clusters are
+    total_direction_penalty = 0.0
+
+    for trip in individual.trips.values():
+        if not trip.order_ids:
+            continue
+
+        active_fleet_size += 1
+        trip_orders = [orders[oid] for oid in trip.order_ids]
+
+        # 1. Constraint: Max Orders
+        if len(trip_orders) > constraints.max_order_count:
+            penalty += config.capacity_penalty_weight * (len(trip_orders) - constraints.max_order_count)
+            is_valid = False
+            invalid_reasons["capacity"] = True
+
+        # 2. Constraint: Max Weight
+        total_weight = sum(o.total_mass_kg for o in trip_orders)
+        max_allowed_weight = constraints.max_weight_per_transport[trip.transport_type]
+        if total_weight > max_allowed_weight:
+            penalty += config.mass_penalty_weight * (total_weight - max_allowed_weight)
+            is_valid = False
+            invalid_reasons["mass"] = True
+
+        # 3. Simulate Route & Time
+        trip_orders.sort(key=lambda x: x.delivery_deadline_at)
+
+        current_time = max(o.pickup_ready_at for o in trip_orders)
+        trip_start_timestamp = current_time.timestamp()
+
+        speed_kmh = constraints.speeds_kmh[trip.transport_type]
+        wh_lat, wh_lon = warehouses[trip.warehouse_id]
+
+        # 4. Evaluate Directional Cohesion (The new "Sweep" metric)
+        # We calculate this once per trip before they start driving
+        cluster_spread = evaluate_cluster_direction(wh_lat, wh_lon, trip_orders)
+        total_direction_penalty += cluster_spread
+
+        current_lat, current_lon = wh_lat, wh_lon
+
+        for order in trip_orders:
+            dist = haversine_distance(current_lat, current_lon, order.lat, order.lon)
+            travel_time_hours = dist / speed_kmh
+            current_time += timedelta(hours=travel_time_hours)
+
+            time_diff_seconds = (current_time - order.delivery_deadline_at).total_seconds()
+            if time_diff_seconds > 0:
+                penalty += config.sla_penalty_weight * (time_diff_seconds / 60)
+                is_valid = False
+                invalid_reasons["sla"] = True
+
+            current_lat, current_lon = order.lat, order.lon
+            total_time += travel_time_hours
+
+        trip_end_timestamp = current_time.timestamp()
+        trip_intervals.append((trip_start_timestamp, trip_end_timestamp))
+
+    # 5. Temporal overlap penalty
+    sync_penalty = evaluate_clusterization_iut(trip_intervals, iut_weight=config.sync_weight)
+
+    # 6. Fleet Size Penalty
+    fleet_penalty = active_fleet_size * config.fleet_weight
+
+    # 7. Directional Penalty Weight
+    weighted_direction_penalty = total_direction_penalty * config.direction_weight
+
+    # Final fitness compilation
+    individual.fitness_score = total_time + penalty + sync_penalty + fleet_penalty + weighted_direction_penalty
+    individual.is_valid = is_valid
+    individual.invalid_reasons = invalid_reasons
+
+    return individual
+
+
+
+def evaluate_fitness_economics(individual: Individual, orders: Dict[int, Order],
                      constraints: Constraint, warehouses: Dict[int, Tuple[float, float]],
                      econ: Economics) -> Individual:
     """
@@ -202,87 +328,4 @@ def evaluate_fitness(individual: Individual, orders: Dict[int, Order],
 
     individual.fitness_score = total_cost_rub
     individual.is_valid = is_valid
-    return individual
-
-def evaluate_fitness_outdated(individual: Individual, orders: Dict[int, Order], constraints: Constraint,
-                     warehouses: Dict[int, Tuple[float, float]]) -> Individual:
-    """
-    Calculates fitness based on time, penalties, IUT, fleet size, AND directional cohesion.
-    """
-    total_time = 0.0
-    penalty = 0.0
-    is_valid = True
-
-    trip_intervals: List[Tuple[float, float]] = []
-    active_fleet_size = 0
-
-    # Keep a running total of how "spread out" the clusters are
-    total_direction_penalty = 0.0
-
-    for trip in individual.trips.values():
-        if not trip.order_ids:
-            continue
-
-        active_fleet_size += 1
-        trip_orders = [orders[oid] for oid in trip.order_ids]
-
-        # 1. Constraint: Max Orders
-        if len(trip_orders) > constraints.max_order_count:
-            penalty += 1000 * (len(trip_orders) - constraints.max_order_count)
-            is_valid = False
-
-        # 2. Constraint: Max Weight
-        total_weight = sum(o.total_mass_kg for o in trip_orders)
-        max_allowed_weight = constraints.max_weight_per_transport[trip.transport_type]
-        if total_weight > max_allowed_weight:
-            penalty += 500 * (total_weight - max_allowed_weight)
-            is_valid = False
-
-        # 3. Simulate Route & Time
-        trip_orders.sort(key=lambda x: x.delivery_deadline_at)
-
-        current_time = max(o.pickup_ready_at for o in trip_orders)
-        trip_start_timestamp = current_time.timestamp()
-
-        speed_kmh = constraints.speeds_kmh[trip.transport_type]
-        wh_lat, wh_lon = warehouses[trip.warehouse_id]
-
-        # 4. Evaluate Directional Cohesion (The new "Sweep" metric)
-        # We calculate this once per trip before they start driving
-        cluster_spread = evaluate_cluster_direction(wh_lat, wh_lon, trip_orders)
-        total_direction_penalty += cluster_spread
-
-        current_lat, current_lon = wh_lat, wh_lon
-
-        for order in trip_orders:
-            dist = haversine_distance(current_lat, current_lon, order.lat, order.lon)
-            travel_time_hours = dist / speed_kmh
-            current_time += timedelta(hours=travel_time_hours)
-
-            time_diff_seconds = (current_time - order.delivery_deadline_at).total_seconds()
-            if time_diff_seconds > 0:
-                penalty += 100 * (time_diff_seconds / 60)
-                is_valid = False
-
-            current_lat, current_lon = order.lat, order.lon
-            total_time += travel_time_hours
-
-        trip_end_timestamp = current_time.timestamp()
-        trip_intervals.append((trip_start_timestamp, trip_end_timestamp))
-
-    # 5. Temporal overlap penalty
-    sync_penalty = evaluate_clusterization_iut(trip_intervals, iut_weight=50.0)
-
-    # 6. Fleet Size Penalty
-    fleet_penalty = active_fleet_size * 2.0
-
-    # 7. Directional Penalty Weight
-    # (e.g., 5.0 hours of equivalent penalty for a terrible North/South route)
-    direction_weight = 5.0
-    weighted_direction_penalty = total_direction_penalty * direction_weight
-
-    # Final fitness compilation
-    individual.fitness_score = total_time + penalty + sync_penalty + fleet_penalty + weighted_direction_penalty
-    individual.is_valid = is_valid
-
     return individual
