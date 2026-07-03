@@ -29,6 +29,7 @@ from itertools import permutations
 from datetime import datetime
 from math import radians, sin, cos, asin, sqrt
 import json
+import time
 
 EARTH_R_KM = 6371.0088
 
@@ -274,4 +275,7 @@ def main():
 
 
 if __name__ == "__main__":
+    t = time.time()
     main()
+    t = time.time() - t
+    print("\nElapsed time: ", t, " seconds.")
