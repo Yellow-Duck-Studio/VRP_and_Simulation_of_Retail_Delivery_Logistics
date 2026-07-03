@@ -13,6 +13,8 @@ class EventType(str, Enum):
     SIMULATION_STARTED = "simulation_started"
     SIMULATION_ENDED = "simulation_ended"
     PAYMENT_SENT = "payment_sent"
+    ROUTE_VALIDATION_PASSED = "route_validation_passed"
+    ROUTE_VALIDATION_FAILED = "route_validation_failed"
 
 @dataclass
 class Event:
