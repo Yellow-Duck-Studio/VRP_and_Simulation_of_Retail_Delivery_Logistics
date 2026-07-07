@@ -2,13 +2,15 @@ from datetime import datetime, timedelta
 from typing import Dict
 from ..engine.event_manager import EventType, Event, EventManager
 from ..engine.state_manager import StateManager
+from ..engine.location_resolver import LocationResolver
 from ..schemas import Courier, CourierStatus, StopType, Location
 from .order_fsm import OrderFSM
 from ..utils import PaymentCalculator, get_logger
 
 class CourierFSM:
     def __init__(self, courier: Courier, state_manager: StateManager,
-                 event_manager: EventManager, order_fsms: Dict[str, OrderFSM], payment_calculator: PaymentCalculator):
+                 event_manager: EventManager, order_fsms: Dict[str, OrderFSM],
+                 payment_calculator: PaymentCalculator, location_resolver: LocationResolver = None):
         self.courier = courier
         self.state_manager = state_manager
         self.event_manager = event_manager
@@ -16,6 +18,7 @@ class CourierFSM:
         self.progress = None
         self.payment_calculator = payment_calculator
         self.route_start_time = None
+        self.location_resolver = location_resolver or LocationResolver(state_manager)
         self.logger = get_logger(f"CourierFSM-{courier.courier_id}")
 
     def start_next_route(self, current_time: datetime) -> bool:
@@ -191,10 +194,12 @@ class CourierFSM:
     # ------------------------------------------------------------------
     def _distance_km(self, from_loc: Location, to_loc: Location) -> float:
         """Return distance in km using the distance matrix, fallback to haversine."""
+        if self.location_resolver.same_location(from_loc, to_loc):
+            return 0.0
         matrix = self.state_manager.distance_matrix
         if matrix is not None:
-            from_key = f"{from_loc.latitude},{from_loc.longitude}"
-            to_key = f"{to_loc.latitude},{to_loc.longitude}"
+            from_key = self.location_resolver.matrix_key(from_loc)
+            to_key = self.location_resolver.matrix_key(to_loc)
             try:
                 return matrix.get_distance(from_key, to_key)
             except KeyError:

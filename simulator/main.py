@@ -50,6 +50,12 @@ def main():
         help="Path to output JSON file for results"
     )
     parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail fast if validation fails"
+    )
+
+    parser.add_argument(
         "--log-level",
         type=str,
         default="INFO",
@@ -80,7 +86,8 @@ def main():
     start_time = datetime.fromisoformat(args.start_time)
     controller = SimulationController(
         start_time=start_time,
-        time_step_minutes=args.time_step
+        time_step_minutes=args.time_step,
+        strict_validation=args.strict
     )
 
     logger.info(f"Loading simulation data from {input_path}...")
@@ -105,7 +112,7 @@ def main():
 
     logger.debug(f"{Colors.BLUE}---------------------------------- Orders ----------------------------------{Colors.RESET}")
     for o_id, order in controller.state_manager.orders.items():
-        logger.debug(f"    Warehouse: {order.warehouse_id}")
+        logger.debug(f"    Warehouse ID: {order.warehouse_id}")
         logger.debug(f"    Mass: {order.mass_kg} kg")
         logger.debug(f"    Time Window: {order.delivery_time_window.start.strftime('%H:%M')} - {order.delivery_time_window.end.strftime('%H:%M')}")
         logger.debug(f"    Ready Time: {order.ready_time.strftime('%H:%M')}")
@@ -127,7 +134,16 @@ def main():
             else:
                 logger.info(f"  {key}: {value:.2f}")
         else:
-            logger.info(f"  {key}: {value}")
+            print(f"  {key}: {value}")
+
+    logger.info(f"{Colors.BLUE}------------------------------ Validation Summary ----------------------------{Colors.RESET}")
+    validation_report = controller.get_validation_report()
+    for key, value in validation_report.summary.items():
+        if isinstance(value, dict):
+            dict_items = ", ".join([f"{k.upper()}: {v}" for k, v in value.items()])
+            print(f"  {key}: {dict_items}")
+        else:
+            print(f"  {key}: {value}")
 
     logger.info(f"{Colors.BLUE}-------------------------------- Event Summary -------------------------------{Colors.RESET}")
     events = controller.event_manager.get_events()

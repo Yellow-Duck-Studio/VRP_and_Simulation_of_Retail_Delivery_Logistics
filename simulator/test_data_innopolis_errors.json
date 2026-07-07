@@ -1,4 +1,5 @@
 {
+  "_comment": "Loads cleanly (every field respects the pydantic schema - positive capacity/mass, valid enums, valid ISO timestamps, all courier/warehouse references resolve) so the simulation runs to completion. The defects are all things TripConnectionValidator (route_validator.py) checks *after* loading, not things pydantic checks at load time: (1) ROUTE_FOOT_001 has two stops sharing sequence_number 2 -> guaranteed ERROR (SEQUENCE_GAP_OR_DUPLICATE), plus the resulting non-contiguous {1,2,4} sequence set also raises a WARNING for the same route. (2) The WH_PEREKRESTOK_INNOPOLIS -> ORD004 entry is missing from distance_matrix, so that hop silently falls back to a haversine estimate -> MISSING_DISTANCE_ENTRY (ERROR if ValidationConfig.require_distance_matrix_entry is on, WARNING otherwise - either way it shows up in issues_by_type). Nothing here relies on dangling courier/courier_type ids, since those are actually used by the simulation engine at runtime and would crash the whole run rather than just show up in the validation report.",
   "courier_types": [
     {
       "type_id": "car",
@@ -183,6 +184,7 @@
     },
     {
       "route_id": "ROUTE_FOOT_001",
+      "_error": "pickup of ORD005 reuses sequence_number 2, already used by the ORD002 delivery -> guaranteed SEQUENCE_GAP_OR_DUPLICATE ERROR, and the resulting {1,2,4} set (vs expected 1..4) also raises the non-contiguous WARNING.",
       "courier_id": "COURIER_FOOT_001",
       "warehouse_id": "WH_PYATEROCHKA_INNOPOLIS",
       "start_location": { "latitude": 55.7544, "longitude": 48.7420 },
@@ -207,7 +209,7 @@
           "order_id": "ORD005",
           "location": { "latitude": 55.7544, "longitude": 48.7420 },
           "stop_type": "pickup",
-          "sequence_number": 3,
+          "sequence_number": 2,
           "service_duration_minutes": 5
         },
         {
@@ -245,6 +247,7 @@
     },
     {
       "route_id": "ROUTE_CAR_002",
+      "_error": "the WH_PEREKRESTOK_INNOPOLIS -> ORD004 leg has no distance_matrix entry (see below), forcing a haversine fallback -> MISSING_DISTANCE_ENTRY.",
       "courier_id": "COURIER_CAR_002",
       "warehouse_id": "WH_PEREKRESTOK_INNOPOLIS",
       "start_location": { "latitude": 55.7520, "longitude": 48.7480 },
@@ -273,7 +276,6 @@
     { "from_id": "WH_PYATEROCHKA_INNOPOLIS", "to_id": "ORD002", "distance": 0.3 },
     { "from_id": "WH_PYATEROCHKA_INNOPOLIS", "to_id": "ORD005", "distance": 0.4 },
     { "from_id": "WH_PEREKRESTOK_INNOPOLIS", "to_id": "ORD003", "distance": 0.6 },
-    { "from_id": "WH_PEREKRESTOK_INNOPOLIS", "to_id": "ORD004", "distance": 0.7 },
     { "from_id": "ORD001", "to_id": "ORD002", "distance": 0.8 },
     { "from_id": "ORD002", "to_id": "ORD005", "distance": 0.5 },
     { "from_id": "ORD003", "to_id": "ORD004", "distance": 0.9 },

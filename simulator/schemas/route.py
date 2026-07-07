@@ -15,8 +15,8 @@ class RouteStop(BaseModel):
     location: Location
     stop_type: StopType
     sequence_number: int = Field(..., ge=1)
-    service_duration_minutes: int = Field(default=5, ge=0)
-    # optional:
+    service_duration_minutes: float = Field(default=5, ge=0)
+    # Computed by simulator during execution, not provided in input
     planned_arrival_time: Optional[datetime] = None
     planned_departure_time: Optional[datetime] = None
 
@@ -28,8 +28,5 @@ class Route(BaseModel):
     start_location: Location
     end_location: Location
     start_time: datetime
-    end_time: datetime
-    total_distance_km: float = Field(default=0.0, ge=0)
-    total_duration_minutes: int = Field(default=0, ge=0)
     status: str = "planned"  # planned, in_progress, completed, cancelled
     stops: List[RouteStop] = Field(default_factory=list)

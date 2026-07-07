@@ -56,20 +56,20 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     for r_data in routes_data:
         if isinstance(r_data.get("start_time"), str):
             r_data["start_time"] = parse_datetime(r_data["start_time"])
-        if isinstance(r_data.get("end_time"), str):
-            r_data["end_time"] = parse_datetime(r_data["end_time"])
         stops_data = r_data.pop("stops", [])
         route = Route(**r_data)
         for stop_data in stops_data:
             location_data = stop_data.pop("location")
+            # planned_arrival_time and planned_departure_time are computed by simulator
             stop = RouteStop(
                 order_id=stop_data["order_id"],
                 location=Location(**location_data),
                 stop_type=stop_data["stop_type"],
                 sequence_number=stop_data["sequence_number"],
-                service_duration_minutes=stop_data.get("service_duration_minutes", 5)
+                service_duration_minutes=stop_data.get("service_duration_minutes", 5),
             )
             route.stops.append(stop)
+
         route.stops.sort(key=lambda s: s.sequence_number)
         state_manager.add_route(route)
         logger.debug(f"Route {route.route_id}: {len(route.stops)} stops")

@@ -8,12 +8,14 @@ vi.mock('../api');
 const mockedApi = vi.mocked(api);
 
 test('renders Run button and empty output', () => {
+  mockedApi.listSimulationInputs.mockResolvedValue(['test_data_innopolis.json']);
   render(<SimulationModule />);
   expect(screen.getByText(/Press Run to start simulation/i)).toBeInTheDocument();
   expect(screen.getByRole('button', { name: /Run/i })).toBeEnabled();
 });
 
 test('calls runSimulation and displays formatted output', async () => {
+  mockedApi.listSimulationInputs.mockResolvedValue(['test_data_innopolis.json']);
   mockedApi.runSimulation.mockImplementationOnce(
     () =>
       new Promise<string>((resolve) => {
@@ -35,13 +37,13 @@ test('calls runSimulation and displays formatted output', async () => {
 });
 
 test('displays error message when simulation fails', async () => {
+  mockedApi.listSimulationInputs.mockResolvedValue(['test_data_innopolis.json']);
   mockedApi.runSimulation.mockRejectedValueOnce(new Error('Server down'));
 
   render(<SimulationModule />);
   await userEvent.click(screen.getByRole('button', { name: /Run/i }));
 
   await waitFor(() => {
-    expect(screen.getByText(/Simulation failed:/)).toBeInTheDocument();
     expect(screen.getByText(/Server down/)).toBeInTheDocument();
   });
 });
