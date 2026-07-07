@@ -50,27 +50,26 @@ class SimulationController:
             "validator"
         ))
 
-        # Below logger part is for informing user about validation found issues TODO: delegate to logger
         if not self.validation_report.is_valid:
             error_issues = [i for i in self.validation_report.issues
                              if i.severity.value == "error"]
-            print(f"[{self.time_manager.current_time}] Route validation found "
+            self.logger.error(f"{self.time_manager.current_time} Route validation found "
                   f"{len(error_issues)} ERROR-level issue(s) across "
                   f"{self.validation_report.summary.get('routes_with_errors', 0)} route(s)")
             for issue in error_issues[:20]:
-                print(f"  - [{issue.route_id}] {issue.issue_type.value}: {issue.message}")
+                self.logger.error(f"{self.time_manager.current_time}  - [{issue.route_id}] {issue.issue_type.value}: {issue.message}")
             if len(error_issues) > 20:
-                print(f"  ... and {len(error_issues) - 20} more")
+                self.logger.error(f"{self.time_manager.current_time}  ... and {len(error_issues) - 20} more")
 
         warnings = [i for i in self.validation_report.issues
                     if i.severity.value == "warning"]
         if warnings:
-            print(f"[{self.time_manager.current_time}] Route validation found "
+            self.logger.warning(f"{self.time_manager.current_time} Route validation found "
                   f"{len(warnings)} WARNING-level issue(s)")
             for issue in warnings[:20]:
-                print(f"  - [{issue.route_id}] {issue.issue_type.value}: {issue.message}")
+                self.logger.warning(f"{self.time_manager.current_time}  - [{issue.route_id}] {issue.issue_type.value}: {issue.message}")
             if len(warnings) > 20:
-                print(f"  ... and {len(warnings) - 20} more")
+                self.logger.warning(f"{self.time_manager.current_time}  ... and {len(warnings) - 20} more")
 
         return self.validation_report
 
