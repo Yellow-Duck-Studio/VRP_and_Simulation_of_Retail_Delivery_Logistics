@@ -12,7 +12,7 @@ from simulator import (
     SimulationController,
     load_simulation_data,
 )
-from simulator.utils.logger import get_logger
+from .utils.logger import get_logger
 
 
 def main():
