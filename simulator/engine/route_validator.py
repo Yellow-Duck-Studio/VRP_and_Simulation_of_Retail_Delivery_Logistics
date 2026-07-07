@@ -4,10 +4,6 @@ Trip Connection Validation for the VRP simulator.
 Purpose
 =======
 Routes fed into the simulator come from an external clustering, VRP solver.
-This module answers one question before start simulating them:
-
-    "Is this a physically realizable sequence of stops, or does it contain
-     an impossible 'teleportation' between two nodes?"
 
 It performs *static* (pre-simulation) validation of Route objects against:
   - the distance matrix (are hops backed by real data, or silent haversine
