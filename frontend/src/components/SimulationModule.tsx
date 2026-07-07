@@ -14,19 +14,21 @@ interface Metrics {
 }
 
 function extractMetrics(text: string): Metrics {
+  const cleanText = text.replace(/(?:\x1b|\u001b|\\033)\[\d+m/g, "");
+
   const num = (re: RegExp) => {
-    const m = text.match(re);
+    const m = cleanText.match(re);
     return m ? parseFloat(m[1]) : undefined;
   };
   const raw = (re: RegExp) => {
-    const m = text.match(re);
+    const m = cleanText.match(re);
     return m ? m[1] : undefined;
   };
+
   return {
     totalOrders: num(/total_orders:\s*(\d+)/),
     deliveredOrders: num(/delivered_orders:\s*(\d+)/),
     slaHitRate: num(/sla_hit_rate:\s*([\d.]+)%/),
-    // Kept as the exact printed string (not re-parsed/rounded) per request.
     totalCost: raw(/Total delivery cost:\s*([\d.]+)/),
     routesWithErrors: num(/routes_with_errors:\s*(\d+)/),
     routesWithWarnings: num(/routes_with_warnings:\s*(\d+)/),
@@ -95,7 +97,6 @@ export default function SimulationModule() {
         setConfig((c) => ({ ...c, input: files[0] }));
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const loading = status === "running";
@@ -124,26 +125,65 @@ export default function SimulationModule() {
   const formatOutput = (text: string) => {
     const lines = text.split("\n");
     let html = "";
+
     for (const line of lines) {
-      const trimmed = line.trim();
-      if (trimmed === "") {
+      if (line.trim() === "") {
         html += '<div style="height:0.5rem;"></div>';
-      } else if (/^===.*===/.test(trimmed)) {
-        html += `<div style="font-weight:bold;color:#1e40af;font-size:1rem;margin-top:0.5rem;">${line}</div>`;
-      } else {
-        const colonIndex = line.indexOf(":");
-        if (colonIndex !== -1 && /^\s+/.test(line)) {
-          const leadingSpaces = line.match(/^(\s+)/)?.[1] || "";
-          const indentLevel = leadingSpaces.length;
-          const key = line.substring(0, colonIndex).trim();
-          const value = line.substring(colonIndex + 1).trim();
-          const pad = (indentLevel / 2) + "rem";
-          html += `<div style="padding-left:${pad};font-family:monospace;font-size:0.875rem;"><span style="font-weight:600;color:#374151;">${key}:</span> ${value}</div>`;
+        continue;
+      }
+
+      let content = line;
+      let prefix = "";
+
+      const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*(.*)/);
+      if (tsMatch) {
+        prefix = `<span style="color:#9ca3af;margin-right:0.5rem;">${tsMatch[1]}</span>`;
+        content = tsMatch[2];
+      }
+
+      let activeStyles = 0;
+      let contentHtml = "";
+
+      const parts = content.split(/(?:\x1b|\u001b|\\033)\[(\d+)m/);
+
+      for (let i = 0; i < parts.length; i++) {
+        if (i % 2 === 0) {
+          contentHtml += parts[i].replace(/</g, "&lt;").replace(/>/g, "&gt;");
         } else {
-          html += `<div style="font-family:monospace;font-size:0.875rem;white-space:pre-wrap;">${line}</div>`;
+          const code = parts[i];
+          if (code === "0") {
+            contentHtml += "</span>".repeat(activeStyles);
+            activeStyles = 0;
+          } else {
+            let style = "";
+            switch (code) {
+              case "94": style = "color: #3b82f6;"; break;
+              case "92": style = "color: #16a34a;"; break;
+              case "93": style = "color: #eab308;"; break;
+              case "91": style = "color: #ef4444;"; break;
+              case "1":  style = "font-weight: 700;"; break;
+              case "2":  style = "color: #9ca3af;"; break;
+            }
+
+            if (style) {
+              contentHtml += `<span style="${style}">`;
+              activeStyles++;
+            }
+          }
         }
       }
+
+      contentHtml += "</span>".repeat(activeStyles);
+
+      contentHtml = contentHtml.replace(/\[DEBUG\]/g, '<span style="color:#9ca3af;font-weight:600;">[DEBUG]</span>');
+      contentHtml = contentHtml.replace(/\[INFO\]/g, '<span style="color:#16a34a;font-weight:600;">[INFO]</span>');
+      contentHtml = contentHtml.replace(/\[WARNING\]/g, '<span style="color:#ca8a04;font-weight:600;">[WARNING]</span>');
+      contentHtml = contentHtml.replace(/\[ERROR\]/g, '<span style="color:#dc2626;font-weight:600;">[ERROR]</span>');
+      contentHtml = contentHtml.replace(/\[CRITICAL\]/g, '<span style="color:#dc2626;font-weight:700;">[CRITICAL]</span>');
+
+      html += `<div style="font-family:monospace;font-size:0.875rem;white-space:pre-wrap;">${prefix}${contentHtml}</div>`;
     }
+
     return html;
   };
 
@@ -240,7 +280,6 @@ export default function SimulationModule() {
         </label>
       </div>
 
-      {/* At-a-glance results */}
       {status === "success" && metrics && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
           <MetricCard label="Delivered" value={`${metrics.deliveredOrders ?? "–"}/${metrics.totalOrders ?? "–"}`} />
