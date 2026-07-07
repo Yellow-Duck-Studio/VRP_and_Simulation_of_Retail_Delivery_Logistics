@@ -85,7 +85,7 @@ export default function SimulationModule() {
     input: "test_data_innopolis.json",
     time_step: 5,
     max_steps: 100,
-    strict: true,
+    strict: false,
   });
 
   useEffect(() => {

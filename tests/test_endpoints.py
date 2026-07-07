@@ -171,7 +171,7 @@ def test_simulate_success(client):
         assert response.status_code == 200
         assert response.text == dummy_output
         mock_run.assert_called_once_with(
-            ["python3", "-m", "simulator.main"],
+            ["python3", "-m", "simulator.main", "--input", "test_data_innopolis.json", "--time-step", "5", "--max-steps", "100"],
             capture_output=True,
             text=True,
             check=True,
