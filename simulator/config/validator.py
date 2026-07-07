@@ -11,8 +11,6 @@ class ValidationSeverity(str, Enum):
 
 class ValidationIssueType(str, Enum):
     MISSING_DISTANCE_ENTRY = "missing_distance_entry"
-    TELEPORTATION = "teleportation"
-    NON_POSITIVE_TRAVEL_WINDOW = "non_positive_travel_window"
     SEQUENCE_GAP_OR_DUPLICATE = "sequence_gap_or_duplicate"
     DUPLICATE_STOP = "duplicate_stop"
     OUTLIER_HOP_DISTANCE = "outlier_hop_distance"
@@ -41,12 +39,6 @@ class ValidationIssue:
 
 @dataclass
 class ValidationConfig:
-    # Tolerance multiplier applied to a courier's max speed before an implied
-    # speed is flagged as teleportation. e.g. 1.15 => 15% slack overrated speed.
-    speed_tolerance: float = 1.15
-    # Minimum acceptable travel window in seconds; below this (with nonzero
-    # distance) is treated as a hard violation regardless of speed math.
-    min_travel_window_seconds: float = 1.0
     # Hops further than mean + N * stdev (within a route) are flagged as
     # statistical outliers. Requires >= min_hops_for_outlier_check hops.
     outlier_std_multiplier: float = 3.0

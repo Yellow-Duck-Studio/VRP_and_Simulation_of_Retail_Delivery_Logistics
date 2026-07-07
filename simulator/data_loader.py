@@ -47,20 +47,13 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
         route = Route(**r_data)
         for stop_data in stops_data:
             location_data = stop_data.pop("location")
-            planned_arrival = stop_data.get("planned_arrival_time")
-            if isinstance(planned_arrival, str):
-                planned_arrival = parse_datetime(planned_arrival)
-            planned_departure = stop_data.get("planned_departure_time")
-            if isinstance(planned_departure, str):
-                planned_departure = parse_datetime(planned_departure)
+            # planned_arrival_time and planned_departure_time are computed by simulator
             stop = RouteStop(
                 order_id=stop_data["order_id"],
                 location=Location(**location_data),
                 stop_type=stop_data["stop_type"],
                 sequence_number=stop_data["sequence_number"],
                 service_duration_minutes=stop_data.get("service_duration_minutes", 5),
-                planned_arrival_time=planned_arrival,
-                planned_departure_time=planned_departure,
             )
             route.stops.append(stop)
 

@@ -16,6 +16,7 @@ class RouteStop(BaseModel):
     stop_type: StopType
     sequence_number: int = Field(..., ge=1)
     service_duration_minutes: float = Field(default=5, ge=0)
+    # Computed by simulator during execution, not provided in input
     planned_arrival_time: Optional[datetime] = None
     planned_departure_time: Optional[datetime] = None
 

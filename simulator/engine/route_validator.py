@@ -124,40 +124,6 @@ class TripConnectionValidator:
                     {"hop_index": idx, "haversine_km": round(distance_km, 3)},
                 ))
 
-            # Temporal feasibility (only checkable when timestamps are present)
-            departure = prev_departure
-            arrival = to_arrival
-            if departure is not None and arrival is not None:
-                available_seconds = (arrival - departure).total_seconds()
-
-                if distance_km > 0 and available_seconds < self.config.min_travel_window_seconds:
-                    issues.append(ValidationIssue(
-                        ValidationSeverity.ERROR, ValidationIssueType.NON_POSITIVE_TRAVEL_WINDOW,
-                        route.route_id,
-                        f"Hop {idx} -> {idx + 1} covers {distance_km:.2f} km but the planned "
-                        f"time window is only {available_seconds:.0f}s",
-                        {"hop_index": idx, "distance_km": round(distance_km, 3),
-                         "available_seconds": available_seconds},
-                    ))
-                elif distance_km > 0 and courier_type is not None:
-                    implied_speed_kmh = distance_km / (available_seconds / 3600.0)
-                    max_allowed = courier_type.speed_kmh * self.config.speed_tolerance
-                    if implied_speed_kmh > max_allowed:
-                        issues.append(ValidationIssue(
-                            ValidationSeverity.ERROR, ValidationIssueType.TELEPORTATION,
-                            route.route_id,
-                            f"Hop {idx} -> {idx + 1}: implied speed {implied_speed_kmh:.1f} km/h "
-                            f"exceeds courier's max feasible speed "
-                            f"({courier_type.speed_kmh:.1f} km/h x{self.config.speed_tolerance} "
-                            f"tolerance = {max_allowed:.1f} km/h) - route is not physically realizable",
-                            {"hop_index": idx, "distance_km": round(distance_km, 3),
-                             "implied_speed_kmh": round(implied_speed_kmh, 1),
-                             "courier_max_speed_kmh": courier_type.speed_kmh},
-                        ))
-
-            if to_stop is not None:
-                prev_departure = to_arrival if to_arrival is not None else prev_departure
-
         issues.extend(self._check_outliers(route, hop_distances))
 
         return issues, hop_distances
@@ -317,7 +283,6 @@ class TripConnectionValidator:
             "clean_route_pct": round((clean_routes / total_routes) * 100, 1) if total_routes else 0.0,
             "issues_by_severity": by_severity,
             "issues_by_type": by_type,
-            "teleportation_count": by_type.get(ValidationIssueType.TELEPORTATION.value, 0),
         }
         if hop_distances:
             summary["hop_distance_km"] = {
