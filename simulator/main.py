@@ -47,6 +47,11 @@ def main():
         default=None,
         help="Path to output JSON file for results"
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Fail fast if validation fails"
+    )
     
     args = parser.parse_args()
 
@@ -68,7 +73,8 @@ def main():
     start_time = datetime.fromisoformat(args.start_time)
     controller = SimulationController(
         start_time=start_time,
-        time_step_minutes=args.time_step
+        time_step_minutes=args.time_step,
+        strict_validation=args.strict
     )
 
     print(f"Loading simulation data from {input_path}...")
@@ -100,13 +106,13 @@ def main():
     
     print("\n=== Orders ===")
     for o_id, order in controller.state_manager.orders.items():
-        print(f"    Warehouse: {order.warehouse_id}")
+        print(f"    Warehouse ID: {order.warehouse_id}")
         print(f"    Mass: {order.mass_kg} kg")
         print(f"    Time Window: {order.delivery_time_window.start.strftime('%H:%M')} - {order.delivery_time_window.end.strftime('%H:%M')}")
         print(f"    Ready Time: {order.ready_time.strftime('%H:%M')}")
-        print(f"    Status: {order.status}")
+        print(f"    Status: {order.status}\n")
     
-    print(f"\n=== Running Simulation ===")
+    print(f"=== Running Simulation ===")
     print(f"Start Time: {start_time.isoformat()}")
     print(f"Time Step: {args.time_step} minutes")
     print(f"Max Steps: {args.max_steps}")
@@ -118,6 +124,15 @@ def main():
     for key, value in metrics.items():
         if isinstance(value, float):
             print(f"  {key}: {value:.2%}" if "rate" in key else f"  {key}: {value:.2f}")
+        else:
+            print(f"  {key}: {value}")
+
+    print("\n=== Validation Summary ===")
+    validation_report = controller.get_validation_report()
+    for key, value in validation_report.summary.items():
+        if isinstance(value, dict):
+            dict_items = ", ".join([f"{k.upper()}: {v}" for k, v in value.items()])
+            print(f"  {key}: {dict_items}")
         else:
             print(f"  {key}: {value}")
     

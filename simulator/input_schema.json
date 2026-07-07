@@ -117,9 +117,6 @@
             "required": ["latitude", "longitude"]
           },
           "start_time": { "type": "string", "format": "date-time" },
-          "end_time": { "type": "string", "format": "date-time" },
-          "total_distance_km": { "type": "number", "minimum": 0 },
-          "total_duration_minutes": { "type": "integer", "minimum": 0 },
           "status": { "type": "string" },
           "stops": {
             "type": "array",
@@ -144,7 +141,7 @@
             }
           }
         },
-        "required": ["route_id", "courier_id", "warehouse_id", "start_location", "end_location", "start_time", "end_time"]
+        "required": ["route_id", "courier_id", "warehouse_id", "start_location", "end_location", "start_time"]
       }
     },
     "distance_matrix": {

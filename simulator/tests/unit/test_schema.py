@@ -2,11 +2,13 @@ import pytest
 import json
 from jsonschema import validate, ValidationError
 from copy import deepcopy
+import os
 
 
 @pytest.fixture
 def schema():
-    with open("input_schema.json", "r", encoding="utf-8") as f:
+    schema_path = os.path.join(os.path.dirname(__file__), "../../input_schema.json")
+    with open(schema_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
 
