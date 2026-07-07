@@ -24,8 +24,9 @@ class SimulationController:
         self.payment_calculator = None
 
     def initialize(self) -> None:
-        self.logger.info(f"Simulation initialization at {self.time_manager.current_time}")
-        self.logger.info(f"Entities: {len(self.state_manager.orders)} orders, "
+        current_time = self.time_manager.current_time
+        self.logger.info(f"{current_time} Simulation initialization")
+        self.logger.info(f"{current_time} Entities: {len(self.state_manager.orders)} orders, "
                          f"{len(self.state_manager.couriers)} couriers, "
                          f"{len(self.state_manager.routes)} routes")
 
@@ -50,14 +51,12 @@ class SimulationController:
 
     def step(self) -> bool:
         """Execute one simulation step."""
+        current_time = self.time_manager.advance()
         if self.max_steps and self.time_manager.total_steps >= self.max_steps:
-            self.logger.info(f"Max steps ({self.max_steps}) reached, stopping")
+            self.logger.info(f"{current_time} Max steps ({self.max_steps}) reached, stopping")
             return False
 
-        current_time = self.time_manager.advance()
-        if self.time_manager.total_steps % 10 == 0:
-            self.logger.info(f"Step {self.time_manager.total_steps} at {current_time}")
-        self.logger.debug(f"Step {self.time_manager.total_steps} details...")
+        self.logger.debug(f"{current_time} Step {self.time_manager.total_steps} details...")
         self.state_manager.save_state(current_time)
         self._process_step_logic(current_time)
         return True
@@ -79,7 +78,8 @@ class SimulationController:
                 fsm.handle_arrival(current_time)
 
     def run(self, max_steps: Optional[int] = None) -> None:
-        self.logger.info("Starting simulation run")
+        current_time = self.time_manager.advance()
+        self.logger.info(f"{current_time} Starting simulation run")
         self.max_steps = max_steps
         self.is_running = True
         self.initialize()
@@ -94,9 +94,10 @@ class SimulationController:
             {},
             "simulator"
         ))
-        self.logger.info("Simulation finished")
+        current_time = self.time_manager.advance()
+        self.logger.info(f"{current_time} Simulation finished")
         metrics = self.get_metrics()
-        self.logger.info(f"Delivered: {metrics['delivered_orders']}/{metrics['total_orders']}, "
+        self.logger.info(f"{current_time} Delivered: {metrics['delivered_orders']}/{metrics['total_orders']}, "
                          f"SLA hit rate: {metrics['sla_hit_rate']:.2%}")
 
     def stop(self) -> None:
