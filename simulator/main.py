@@ -12,7 +12,7 @@ from simulator import (
     SimulationController,
     load_simulation_data,
 )
-from .utils.logger import get_logger
+from simulator.utils.logger import get_logger
 
 
 def main():
@@ -85,13 +85,6 @@ def main():
 
     logger.info(f"Loading simulation data from {input_path}...")
     load_simulation_data(str(input_path), controller.state_manager)
-
-    logger.info("=== Initial State ===")
-    logger.info(f"Warehouses: {len(controller.state_manager.warehouses)}")
-    logger.info(f"Courier Types: {len(controller.state_manager.courier_types)}")
-    logger.info(f"Couriers: {len(controller.state_manager.couriers)}")
-    logger.info(f"Orders: {len(controller.state_manager.orders)}")
-    logger.info(f"Routes: {len(controller.state_manager.routes)}")
 
     logger.debug("=== Warehouses ===")
     for wh_id, wh in controller.state_manager.warehouses.items():
