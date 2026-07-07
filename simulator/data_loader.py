@@ -43,8 +43,6 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     for r_data in data.get("routes", []):
         if isinstance(r_data.get("start_time"), str):
             r_data["start_time"] = parse_datetime(r_data["start_time"])
-        if isinstance(r_data.get("end_time"), str):
-            r_data["end_time"] = parse_datetime(r_data["end_time"])
         stops_data = r_data.pop("stops", [])
         route = Route(**r_data)
         for stop_data in stops_data:
