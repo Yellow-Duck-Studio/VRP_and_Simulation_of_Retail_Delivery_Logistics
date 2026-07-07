@@ -170,8 +170,8 @@ if __name__ == "__main__":
     with open('data/master_clusterizations.json', 'r', encoding='utf-8') as file:
         clustering_variants = json.load(file)
 
-    orders_df = pd.read_csv('data/enriched_orders.csv')
-    warehouses_df = pd.read_csv('data/enriched_warehouses.csv')
+    orders_df = pd.read_csv('data/orders.csv')
+    warehouses_df = pd.read_csv('data/warehouses.csv')
 
     # Проверяем наличие задачи в JSON
     if polygon_id not in clustering_variants:

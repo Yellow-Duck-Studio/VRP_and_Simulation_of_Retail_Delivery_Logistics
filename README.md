@@ -1,54 +1,196 @@
-# VRP_and_Simulation_of_Retail_Delivery_Logistics
+# VRP and Simulation of Retail Delivery Logistics
 
-# Local Setup & Execution Guide
+![CI Status](https://github.com/Yellow-Duck-Studio/VRP_and_Simulation_of_Retail_Delivery_Logistics/actions/workflows/simulator_tests.yml/badge.svg)
+![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)
 
-## 1. Prerequisites
+<div align="center">
+  <img src="assets/logo.png" alt="Project Logo" width="200"/>
+</div>
 
-Ensure you have Python installed on your system.
+## About the Project
+Managing retail delivery logistics involves complex mathematical routing and precise cost calculations. Current systems often struggle with inefficient route validation, leading to financial losses in courier payouts. 
 
-Install the project dependencies (NumPy, pandas, scikit-learn, Pydantic, etc.) by running your package manager, for example:
+Built for the Industrial track, this project addresses this gap by providing an automated VRP (Vehicle Routing Problem) simulator. Our solution evaluates delivery efficiency against a baseline using advanced algorithms to provide actionable financial and logistical analytics.
+
+The system is divided into two core components:
+1. **Clustering Module:** Automates the optimal grouping of delivery orders using DBSCAN and Evolutionary algorithms.
+2. **Simulation Module:** Validates VRP solutions and precisely calculates courier compensation based on simulated outcomes.
+
+## Dashboard Preview
+
+<!-- Dashboard Screenshot Placeholder -->
+<div align="center">
+  <img src="assets/dashboard_overview.png" alt="Dashboard Overview" width="800"/>
+</div>
+
+<!-- Simulation Metrics Placeholder -->
+<div align="center">
+  <img src="assets/simulation_metrics.png" alt="Simulation Metrics" width="800"/>
+</div>
+
+## Quick Start with Docker
+
+The fastest way to run the entire system is using Docker Compose:
+
+```bash
+# Clone the repository
+git clone https://github.com/Yellow-Duck-Studio/VRP_and_Simulation_of_Retail_Delivery_Logistics.git
+cd VRP_and_Simulation_of_Retail_Delivery_Logistics
+
+# Build and start all services
+docker compose up --build
+
+# Access the frontend at http://localhost
+# Backend API will be available at http://localhost:3001
+```
+
+To stop the services:
+
+```bash
+docker compose down
+```
+
+## Development Roadmap
+
+**MVP 0: Core Architecture & Data Ingestion (Current Scope)**
+* Parsing and ingestion of raw simulation datasets.
+* Initial cluster generation using DBSCAN.
+* Implementation of an Evolutionary algorithm for optimal cluster configuration.
+* Structured output generation of final clustering results.
+* Foundational system flow with basic validation placeholders and data-reading tests.
+
+**MVP 1: Functional Validation**
+* Full implementation of VRP constraint validation logic.
+* Comprehensive unit and integration testing pipelines for validation verdicts.
+
+**MVP 2: Analytics & Refinement**
+* Refinement of core simulation mechanics.
+* Introduction of logistics analytics, specifically courier payment calculations.
+* Integration testing for analytical outputs.
+
+**Out of Scope (Postponed)**
+* Clarke-Wright algorithm for baseline initial splitting.
+* Destroy & Repair algorithms for advanced local optimization.
+* Integration with external customer services.
+
+## Technical Stack
+* **Python:** Core backend language for rapid prototyping and robust logic.
+* **NumPy:** C++ backed processing for high-speed mathematical array operations crucial to VRP calculations.
+* **scikit-learn:** Reliable pre-built algorithms (DBSCAN) and mathematical metrics.
+* **Pandas:** Efficient manipulation and parsing of initial raw datasets.
+* **Pydantic:** Strict object creation and data validation within the simulation module.
+* **pytest:** Primary framework for all unit and integration testing.
+
+## Manual Installation
+
+### Prerequisites
+
+- Python 3.12+
+- Node.js 25+
+- npm
+
+### Step 1: Install Python Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## 2. Data Preparation
-
-Locate the `data/` directory in the root of the project.
-
-Place your input files containing the configurations for warehouses, orders, and types of transport directly into this `data/` folder before running the scripts.
-
-You can find the data by following the link:
-https://disk.yandex.ru/d/7LI0uwLGG3cPbw
-
-## 3. Running the Clustering Algorithm
-
-Open your terminal and navigate to the project root directory.
-
-Execute the main script to run the DBSCAN and Evolutionary algorithms:
+### Step 2: Install Frontend Dependencies
 
 ```bash
-python main.py
+cd frontend
+npm install
+cd ..
 ```
 
-The system will parse the local datasets in the `data/` folder, execute the evolution process, and output the optimized clusterizations.
+## Running Modules Separately
 
-## 4. Viewing the Visualizations
+### 1. Clustering Module
 
-Once the algorithm has successfully generated the clusters, you can visualize specific results.
-
-Run the visualization script from your terminal:
+Run the evolutionary clustering algorithm to optimize order groupings:
 
 ```bash
-python vizual.py
-```
-or
-```bash
-python vizual.py <task-number>
-```
-or
-```bash
-python vizual.py <task-number> <clusterization-number>
+python main.py DBSCAN
+
+# Available algorithms:
+python main.py CLWR
+python main.py SWEEP
+python main.py DSTR
+python main.py RND
 ```
 
-Provide the specific task and clusterization number you wish to view (`python vizual.py 1 1000`).
+This will:
+- Load orders from `data/orders.csv`
+- Load warehouses from `data/warehouses.csv`
+- Load transport constraints from `data/transport_types.csv`
+- Generate optimized clusters for each task
+- Save results to `data/master_clusterizations.json`
+
+### 2. Simulation Module
+
+Run the discrete event simulation with clustered data:
+
+```bash
+# Basic simulation with default parameters
+python -m simulator.main --input test_data_innopolis.json
+
+# Full simulation with custom parameters
+python -m simulator.main \
+  --input test_data_innopolis.json \
+  --start-time "2024-06-17T09:00:00" \
+  --time-step 5 \
+  --max-steps 100 \
+  --output results.json
+```
+
+**Command-line Arguments:**
+- `--input`: Path to input JSON file with simulation data
+- `--start-time`: Simulation start time in ISO format (default: `2024-06-17T09:00:00`)
+- `--time-step`: Time step in minutes (default: `5`)
+- `--max-steps`: Maximum number of simulation steps (default: `100`)
+- `--output`: Path to output JSON file for results (optional)
+
+### 3. Frontend Dashboard
+
+Start the development server:
+
+```bash
+python server.py
+cd frontend
+npm run dev
+```
+
+Access the dashboard at `http://localhost:5173`
+
+For production build:
+
+```bash
+cd frontend
+npm run build
+npm run preview
+```
+
+## Input Data Format
+
+### Clustering Module Input
+
+- **orders.csv**: Order data with coordinates, weights, and time windows
+- **warehouses.csv**: Warehouse locations and capacities
+- **transport_types.csv**: Vehicle types with speed and payload limits
+
+### Simulation Module Input
+
+The simulation expects a JSON file with the following structure:
+
+```json
+{
+  "warehouses": [...],
+  "courier_types": [...],
+  "couriers": [...],
+  "orders": [...],
+  "routes": [...],
+  "distance_matrix": {...}
+}
+```
+
+See `simulator/input_schema.json` for the complete schema definition and `simulator/test_data_innopolis.json` for an example.
