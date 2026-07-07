@@ -134,16 +134,16 @@ def main():
             else:
                 logger.info(f"  {key}: {value:.2f}")
         else:
-            print(f"  {key}: {value}")
+            logger.info(f"  {key}: {value}")
 
     logger.info(f"{Colors.BLUE}------------------------------ Validation Summary ----------------------------{Colors.RESET}")
     validation_report = controller.get_validation_report()
     for key, value in validation_report.summary.items():
         if isinstance(value, dict):
             dict_items = ", ".join([f"{k.upper()}: {v}" for k, v in value.items()])
-            print(f"  {key}: {dict_items}")
+            logger.info(f"  {key}: {dict_items}")
         else:
-            print(f"  {key}: {value}")
+            logger.info(f"  {key}: {value}")
 
     logger.info(f"{Colors.BLUE}-------------------------------- Event Summary -------------------------------{Colors.RESET}")
     events = controller.event_manager.get_events()
