@@ -6,9 +6,11 @@ from .event_manager import EventType, Event, EventManager
 from .state_manager import StateManager
 from ..utils import PaymentCalculator
 from typing import Optional, Dict
+from ..utils.logger import get_logger
 
 class SimulationController:
     def __init__(self, start_time: datetime, time_step_minutes: int = 1):
+        self.logger = get_logger("SimulationController")
         self.time_manager = TimeManager(start_time, time_step_minutes)
         self.event_manager = EventManager()
         self.state_manager = StateManager()
@@ -22,7 +24,10 @@ class SimulationController:
         self.payment_calculator = None
 
     def initialize(self) -> None:
-        print(f"[{self.time_manager.current_time}] Simulation initialization")
+        self.logger.info(f"Simulation initialization at {self.time_manager.current_time}")
+        self.logger.info(f"Entities: {len(self.state_manager.orders)} orders, "
+                         f"{len(self.state_manager.couriers)} couriers, "
+                         f"{len(self.state_manager.routes)} routes")
 
         config = self.state_manager.payment_config or {}
         self.payment_calculator = PaymentCalculator(config)
@@ -46,9 +51,13 @@ class SimulationController:
     def step(self) -> bool:
         """Execute one simulation step."""
         if self.max_steps and self.time_manager.total_steps >= self.max_steps:
+            self.logger.info(f"Max steps ({self.max_steps}) reached, stopping")
             return False
 
         current_time = self.time_manager.advance()
+        if self.time_manager.total_steps % 10 == 0:
+            self.logger.info(f"Step {self.time_manager.total_steps} at {current_time}")
+        self.logger.debug(f"Step {self.time_manager.total_steps} details...")
         self.state_manager.save_state(current_time)
         self._process_step_logic(current_time)
         return True
@@ -70,6 +79,7 @@ class SimulationController:
                 fsm.handle_arrival(current_time)
 
     def run(self, max_steps: Optional[int] = None) -> None:
+        self.logger.info("Starting simulation run")
         self.max_steps = max_steps
         self.is_running = True
         self.initialize()
@@ -84,6 +94,10 @@ class SimulationController:
             {},
             "simulator"
         ))
+        self.logger.info("Simulation finished")
+        metrics = self.get_metrics()
+        self.logger.info(f"Delivered: {metrics['delivered_orders']}/{metrics['total_orders']}, "
+                         f"SLA hit rate: {metrics['sla_hit_rate']:.2%}")
 
     def stop(self) -> None:
         self.is_running = False
