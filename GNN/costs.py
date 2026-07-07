@@ -1,12 +1,12 @@
 """
 cost = fixed_fee + per_km_fee * route_distance_km
                   + per_order_fee * order_count
-                  + per_kg_min_fee * route_kg_min
+                  + per_kg_min_fee * total_mass_kg
 
-route_kg_min трактуется как total_mass_kg(кластера) * общее_время_маршрута_в_минутах
-("стоимость за кг*мин" -> тарифицируется вес всего груза за всё время его
-перевозки). Если у тебя другая семантика (например, сумма по перегонам
-mass_i * leg_time) — поправь в best_route_for_transport, помечено ниже.
+Confirmed against the checker: per_kg_min_fee multiplies total cluster mass
+only (NOT mass * route duration, despite the "_min" in the name). Route
+duration is still tracked (best["duration_min"]) since it's useful for
+feasibility/debugging, but it no longer enters the cost formula.
 
 Проверка допустимости кластера для тарифа:
   - все заказы одного типа транспорта (это гарантируется тем, что мы
@@ -30,10 +30,10 @@ from io_utils import TransportTariff
 
 
 def best_route_for_transport(
-    warehouse_lat: float,
-    warehouse_lon: float,
-    orders: List[dict],
-    tariff: TransportTariff,
+        warehouse_lat: float,
+        warehouse_lon: float,
+        orders: List[dict],
+        tariff: TransportTariff,
 ) -> Optional[dict]:
     n = len(orders)
     if n == 0 or n > MAX_CLUSTER_SIZE:
@@ -65,13 +65,12 @@ def best_route_for_transport(
             continue
 
         total_time_min = (cur_time - start_time).total_seconds() / 60.0
-        kg_min = total_mass * total_time_min  # см. допущение в docstring
 
         cost = (
-            tariff.fixed_fee
-            + tariff.per_km_fee * total_dist
-            + tariff.per_order_fee * n
-            + tariff.per_kg_min_fee * kg_min
+                tariff.fixed_fee
+                + tariff.per_km_fee * total_dist
+                + tariff.per_order_fee * n
+                + tariff.per_kg_min_fee * total_mass
         )
         if best is None or cost < best["cost"]:
             best = {
@@ -85,10 +84,10 @@ def best_route_for_transport(
 
 
 def best_cluster_solution(
-    warehouse_lat: float,
-    warehouse_lon: float,
-    orders: List[dict],
-    tariffs: List[TransportTariff],
+        warehouse_lat: float,
+        warehouse_lon: float,
+        orders: List[dict],
+        tariffs: List[TransportTariff],
 ) -> Optional[dict]:
     best = None
     for tariff in tariffs:
@@ -99,11 +98,11 @@ def best_cluster_solution(
 
 
 def clustering_total_cost(
-    warehouse_lat: float,
-    warehouse_lon: float,
-    orders_by_id: Dict[str, dict],
-    clusters: List[List[str]],
-    tariffs: List[TransportTariff],
+        warehouse_lat: float,
+        warehouse_lon: float,
+        orders_by_id: Dict[str, dict],
+        clusters: List[List[str]],
+        tariffs: List[TransportTariff],
 ) -> Optional[float]:
     total = 0.0
     seen = set()
