@@ -4,6 +4,7 @@ Main entry point for the Retail Delivery Logistics Simulator.
 """
 import argparse
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from simulator import (
     SimulationController,
     load_simulation_data,
 )
-from .utils.logger import get_logger
+from simulator.utils.logger import get_logger
 
 
 def main():
@@ -48,7 +49,14 @@ def main():
         default=None,
         help="Path to output JSON file for results"
     )
-    
+    parser.add_argument(
+        "--log-level",
+        type=str,
+        default="INFO",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Set logging level"
+    )
+
     args = parser.parse_args()
 
     os.environ["LOG_LEVEL"] = args.log_level
@@ -77,8 +85,7 @@ def main():
 
     logger.info(f"Loading simulation data from {input_path}...")
     load_simulation_data(str(input_path), controller.state_manager)
-    
-    logger.info("=== Initial State ===")
+
     logger.info("=== Initial State ===")
     logger.info(f"Warehouses: {len(controller.state_manager.warehouses)}")
     logger.info(f"Courier Types: {len(controller.state_manager.courier_types)}")
@@ -101,15 +108,13 @@ def main():
         ct = controller.state_manager.courier_types.get(courier.courier_type_id)
         logger.debug(f"  {c_id}: {ct.name if ct else 'Unknown'}")
         logger.debug(f"    Status: {courier.status}, Load: {courier.current_load} kg")
-        logger.debug(
-            f"    Location: ({courier.current_location.latitude:.4f}, {courier.current_location.longitude:.4f})")
+        logger.debug(f"    Location: ({courier.current_location.latitude:.4f}, {courier.current_location.longitude:.4f})")
 
     logger.debug("=== Orders ===")
     for o_id, order in controller.state_manager.orders.items():
         logger.debug(f"    Warehouse: {order.warehouse_id}")
         logger.debug(f"    Mass: {order.mass_kg} kg")
-        logger.debug(
-            f"    Time Window: {order.delivery_time_window.start.strftime('%H:%M')} - {order.delivery_time_window.end.strftime('%H:%M')}")
+        logger.debug(f"    Time Window: {order.delivery_time_window.start.strftime('%H:%M')} - {order.delivery_time_window.end.strftime('%H:%M')}")
         logger.debug(f"    Ready Time: {order.ready_time.strftime('%H:%M')}")
         logger.debug(f"    Status: {order.status}")
 
@@ -117,9 +122,9 @@ def main():
     logger.info(f"Start Time: {start_time.isoformat()}")
     logger.info(f"Time Step: {args.time_step} minutes")
     logger.info(f"Max Steps: {args.max_steps}")
-    
+
     controller.run(max_steps=args.max_steps)
-    
+
     logger.info("=== Simulation Results ===")
     metrics = controller.get_metrics()
     for key, value in metrics.items():
@@ -134,7 +139,7 @@ def main():
     logger.info("=== Event Summary ===")
     events = controller.event_manager.get_events()
     logger.info(f"  Total Events: {len(events)}")
-    
+
     from simulator.engine import EventType
     for event_type in EventType:
         event_count = len(controller.event_manager.get_events(event_type))
@@ -153,11 +158,11 @@ def main():
         logger.info(f"  Courier {courier_id}: {payment:.2f} rub")
 
     logger.info(f"  Total delivery cost: {results['total_delivery_cost']:.2f} rub")
-    
+
     # Save results if output path specified
     if args.output:
         output_path = Path(args.output)
-        results = {
+        results_json = {
             "metrics": metrics,
             "events": [
                 {
@@ -186,11 +191,11 @@ def main():
                 }
             }
         }
-        
+
         with open(output_path, 'w') as f:
-            json.dump(results, f, indent=2)
+            json.dump(results_json, f, indent=2)
         logger.info(f"Results saved to {args.output}")
-    
+
     return 0
 
 
