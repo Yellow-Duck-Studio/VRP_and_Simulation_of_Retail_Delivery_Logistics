@@ -12,7 +12,6 @@ This module answers one question before start simulating them:
 It performs *static* (pre-simulation) validation of Route objects against:
   - the distance matrix (are hops backed by real data, or silent haversine
     fallbacks that under/over-estimate real road distance?)
-  - courier physical speed limits (implied speed between consecutive stops)
   - route sequence integrity (gaps, duplicates)
   - declared route totals vs. actually computed geometry
   - statistical outliers in hop distance within a route
