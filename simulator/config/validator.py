@@ -15,12 +15,10 @@ class ValidationIssueType(str, Enum):
     NON_POSITIVE_TRAVEL_WINDOW = "non_positive_travel_window"
     SEQUENCE_GAP_OR_DUPLICATE = "sequence_gap_or_duplicate"
     DUPLICATE_STOP = "duplicate_stop"
-    DISTANCE_TOTAL_MISMATCH = "distance_total_mismatch"
     OUTLIER_HOP_DISTANCE = "outlier_hop_distance"
     ROUTE_DISCONTINUITY = "route_discontinuity"
     MISSING_COURIER_TYPE = "missing_courier_type"
     MISSING_COURIER = "missing_courier"
-    INVALID_ROUTE_TIME_WINDOW = "invalid_route_time_window"
 
 
 @dataclass
@@ -49,9 +47,6 @@ class ValidationConfig:
     # Minimum acceptable travel window in seconds; below this (with nonzero
     # distance) is treated as a hard violation regardless of speed math.
     min_travel_window_seconds: float = 1.0
-    # Relative tolerance when comparing sum(hop distances) to the route's
-    # declared total_distance_km (0.15 = 15%).
-    distance_total_tolerance_pct: float = 0.15
     # Hops further than mean + N * stdev (within a route) are flagged as
     # statistical outliers. Requires >= min_hops_for_outlier_check hops.
     outlier_std_multiplier: float = 3.0

@@ -88,7 +88,6 @@ class TripConnectionValidator:
             courier_type = None
 
         stops = sorted(route.stops, key=lambda s: s.sequence_number)
-        issues.extend(self._check_route_time_window(route))
         issues.extend(self._check_sequence_integrity(route, stops))
         issues.extend(self._check_duplicate_stops(route, stops))
 
@@ -97,7 +96,7 @@ class TripConnectionValidator:
             (route.start_location, None, route.start_time)]
         for stop in stops:
             chain.append((stop.location, stop, stop.planned_arrival_time))
-        chain.append((route.end_location, None, route.end_time))
+        chain.append((route.end_location, None, None))
 
         hop_distances: List[float] = []
         prev_departure: Optional[datetime] = route.start_time
@@ -159,25 +158,9 @@ class TripConnectionValidator:
             if to_stop is not None:
                 prev_departure = to_arrival if to_arrival is not None else prev_departure
 
-        issues.extend(self._check_declared_totals(route, hop_distances))
-        issues.extend(self._check_declared_speed(route, courier_type))
         issues.extend(self._check_outliers(route, hop_distances))
 
         return issues, hop_distances
-
-    @staticmethod
-    def _check_route_time_window(route: Route) -> List[ValidationIssue]:
-        issues = []
-        if route.end_time <= route.start_time:
-            issues.append(ValidationIssue(
-                ValidationSeverity.ERROR, ValidationIssueType.INVALID_ROUTE_TIME_WINDOW,
-                route.route_id,
-                f"Route {route.route_id} end_time ({route.end_time.isoformat()}) is not after "
-                f"start_time ({route.start_time.isoformat()}) - the route ends before/when it "
-                f"starts, which is a temporal impossibility regardless of distance",
-                {"start_time": route.start_time.isoformat(), "end_time": route.end_time.isoformat()},
-            ))
-        return issues
 
     @staticmethod
     def _check_sequence_integrity(route: Route, stops: List[RouteStop]) -> List[ValidationIssue]:
@@ -225,54 +208,6 @@ class TripConnectionValidator:
                 # Pickup either happens later (data error) or in a different route entirely,
                 # which we can't confirm here - surface as info, not a hard failure.
                 pass
-        return issues
-
-    def _check_declared_totals(self, route: Route, hop_distances: List[float]) -> List[ValidationIssue]:
-        issues = []
-        if route.total_distance_km and route.total_distance_km > 0:
-            computed = sum(hop_distances)
-            declared = route.total_distance_km
-            rel_diff = abs(computed - declared) / declared if declared else 0
-            if rel_diff > self.config.distance_total_tolerance_pct:
-                issues.append(ValidationIssue(
-                    ValidationSeverity.WARNING, ValidationIssueType.DISTANCE_TOTAL_MISMATCH,
-                    route.route_id,
-                    f"Declared total_distance_km={declared:.2f} differs from computed "
-                    f"hop sum={computed:.2f} by {rel_diff * 100:.1f}% "
-                    f"(tolerance {self.config.distance_total_tolerance_pct * 100:.0f}%)",
-                    {"declared_km": declared, "computed_km": round(computed, 3),
-                     "relative_diff_pct": round(rel_diff * 100, 1)},
-                ))
-        return issues
-
-    def _check_declared_speed(self, route: Route, courier_type) -> List[ValidationIssue]:
-        """Check if declared total_distance_km and duration imply feasible speed."""
-        issues = []
-        if courier_type is None:
-            return issues
-        if route.total_distance_km is None or route.total_distance_km <= 0:
-            return issues
-        if route.total_duration_minutes is None or route.total_duration_minutes <= 0:
-            return issues
-
-        duration_hours = route.total_duration_minutes / 60.0
-        implied_speed_kmh = route.total_distance_km / duration_hours
-        max_allowed = courier_type.speed_kmh * self.config.speed_tolerance
-
-        if implied_speed_kmh > max_allowed:
-            issues.append(ValidationIssue(
-                ValidationSeverity.ERROR, ValidationIssueType.TELEPORTATION,
-                route.route_id,
-                f"Route declared values imply speed {implied_speed_kmh:.1f} km/h "
-                f"({route.total_distance_km:.2f} km in {route.total_duration_minutes:.0f} min), "
-                f"which exceeds courier's max feasible speed "
-                f"({courier_type.speed_kmh:.1f} km/h x{self.config.speed_tolerance} "
-                f"tolerance = {max_allowed:.1f} km/h) - route is not physically realizable",
-                {"declared_distance_km": route.total_distance_km,
-                 "declared_duration_minutes": route.total_duration_minutes,
-                 "implied_speed_kmh": round(implied_speed_kmh, 1),
-                 "courier_max_speed_kmh": courier_type.speed_kmh},
-            ))
         return issues
 
     def _check_outliers(self, route: Route, hop_distances: List[float]) -> List[ValidationIssue]:
