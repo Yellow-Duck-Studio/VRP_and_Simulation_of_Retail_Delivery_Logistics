@@ -97,7 +97,7 @@ def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path,
                  total_gt_cost=("gt_cost", "sum"))
             .reset_index()
         )
-        task_summary["ratio"] = task_summary["total_pred_cost"] / task_summary["total_gt_cost"]
+        task_summary["ratio"] = task_summary["total_gt_cost"] / task_summary["total_pred_cost"]
 
         print("\n=== per-task comparison (pred vs. optimal) ===")
         print(task_summary.to_string(index=False, float_format=lambda x: f"{x:.2f}"))
