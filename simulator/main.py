@@ -12,7 +12,7 @@ from simulator import (
     SimulationController,
     load_simulation_data,
 )
-from simulator.utils.logger import get_logger
+from simulator.utils.logger import get_logger, Colors
 
 
 def main():
@@ -86,24 +86,24 @@ def main():
     logger.info(f"Loading simulation data from {input_path}...")
     load_simulation_data(str(input_path), controller.state_manager)
 
-    logger.debug("=== Warehouses ===")
+    logger.debug(f"{Colors.BLUE}-------------------------------- Warehouses --------------------------------{Colors.RESET}")
     for wh_id, wh in controller.state_manager.warehouses.items():
         logger.debug(f"  {wh_id}: {wh.location.address or 'No address'}")
         logger.debug(f"    Location: ({wh.location.latitude:.4f}, {wh.location.longitude:.4f})")
 
-    logger.debug("=== Courier Types ===")
+    logger.debug(f"{Colors.BLUE}------------------------------- Courier Types -------------------------------{Colors.RESET}")
     for ct_id, ct in controller.state_manager.courier_types.items():
         logger.debug(f"  {ct_id}: {ct.name}")
         logger.debug(f"    Capacity: {ct.capacity_kg} kg, Speed: {ct.speed_kmh} km/h")
 
-    logger.debug("=== Couriers ===")
+    logger.debug(f"{Colors.BLUE}---------------------------------- Couriers ---------------------------------{Colors.RESET}")
     for c_id, courier in controller.state_manager.couriers.items():
         ct = controller.state_manager.courier_types.get(courier.courier_type_id)
         logger.debug(f"  {c_id}: {ct.name if ct else 'Unknown'}")
         logger.debug(f"    Status: {courier.status}, Load: {courier.current_load} kg")
         logger.debug(f"    Location: ({courier.current_location.latitude:.4f}, {courier.current_location.longitude:.4f})")
 
-    logger.debug("=== Orders ===")
+    logger.debug(f"{Colors.BLUE}---------------------------------- Orders ----------------------------------{Colors.RESET}")
     for o_id, order in controller.state_manager.orders.items():
         logger.debug(f"    Warehouse: {order.warehouse_id}")
         logger.debug(f"    Mass: {order.mass_kg} kg")
@@ -111,14 +111,14 @@ def main():
         logger.debug(f"    Ready Time: {order.ready_time.strftime('%H:%M')}")
         logger.debug(f"    Status: {order.status}")
 
-    logger.info("=== Running Simulation ===")
+    logger.info(f"{Colors.BLUE}----------------------------- Running Simulation -----------------------------{Colors.RESET}")
     logger.info(f"Start Time: {start_time.isoformat()}")
     logger.info(f"Time Step: {args.time_step} minutes")
     logger.info(f"Max Steps: {args.max_steps}")
 
     controller.run(max_steps=args.max_steps)
 
-    logger.info("=== Simulation Results ===")
+    logger.info(f"{Colors.BLUE}----------------------------- Simulation Results -----------------------------{Colors.RESET}")
     metrics = controller.get_metrics()
     for key, value in metrics.items():
         if isinstance(value, float):
@@ -129,7 +129,7 @@ def main():
         else:
             logger.info(f"  {key}: {value}")
 
-    logger.info("=== Event Summary ===")
+    logger.info(f"{Colors.BLUE}-------------------------------- Event Summary -------------------------------{Colors.RESET}")
     events = controller.event_manager.get_events()
     logger.info(f"  Total Events: {len(events)}")
 
@@ -141,12 +141,12 @@ def main():
 
     results = controller.get_results()
 
-    logger.info("=== Delivery Results ===")
+    logger.info(f"{Colors.BLUE}------------------------------ Delivery Results ------------------------------{Colors.RESET}")
     for order_id, delivery_time in results["order_delivery_times"].items():
         in_window = results["order_delivered_in_window"][order_id]
         logger.info(f"  Order {order_id}: delivered at {delivery_time}, in window: {in_window}")
 
-    logger.info("=== Courier Payments ===")
+    logger.info(f"{Colors.BLUE}------------------------------ Courier Payments ------------------------------{Colors.RESET}")
     for courier_id, payment in results["courier_payments"].items():
         logger.info(f"  Courier {courier_id}: {payment:.2f} rub")
 
