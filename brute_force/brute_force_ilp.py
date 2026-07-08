@@ -40,8 +40,15 @@ def haversine_vec(lat1, lon1, lat2, lon2):
 
 
 def load_data(orders_path, warehouses_path, transport_path):
-    orders = pd.read_csv(orders_path)
-    warehouses = pd.read_csv(warehouses_path)
+    # task_id/warehouse_id/order_id forced to str at load time -- otherwise
+    # pandas silently upcasts these ID columns to float64 (e.g. "1" -> 1.0)
+    # if it encounters any NaN in the column, which corrupts the string keys
+    # written into the master archive (e.g. "1.0" instead of "1") and breaks
+    # lookups in io_utils.py's _match_solution. Same bug as in
+    # brute_force_solver.py, fixed the same way.
+    id_dtypes = {"task_id": str, "warehouse_id": str}
+    orders = pd.read_csv(orders_path, dtype={**id_dtypes, "order_id": str})
+    warehouses = pd.read_csv(warehouses_path, dtype=id_dtypes)
     transports = pd.read_csv(transport_path)
 
     # Convert to epoch seconds robustly, regardless of which datetime64
@@ -244,19 +251,23 @@ def main(orders_path, warehouses_path, transport_path, out_prefix, max_k=5, verb
     summary_df = pd.DataFrame(summary_rows)
     summary_df.to_csv(f"{out_prefix}_summary.csv", index=False)
 
-    # master_clusterizations.json-compatible archive
+    # master_clusterizations.json-compatible archive -- kept grouped by
+    # warehouse_id (order_id is only unique WITHIN a task, so flattening
+    # trips across warehouses loses the info needed to recover which
+    # warehouse a trip belongs to; see build_master_archive() in
+    # brute_force_solver.py for the identical fix)
     master_archive = {}
     for task_id, wh_results in results.items():
-        trips, any_infeasible = [], False
+        by_warehouse, any_infeasible = {}, False
         for wh_id, sol in wh_results.items():
             if sol is None:
                 any_infeasible = True
                 continue
-            for cluster in sol["clusters"]:
-                trips.append([int(oid) for oid in cluster["order_ids"]])
+            trips = [[int(oid) for oid in cluster["order_ids"]] for cluster in sol["clusters"]]
+            by_warehouse[str(wh_id)] = trips
         if any_infeasible:
             continue
-        master_archive[f"task_{task_id}"] = [trips]
+        master_archive[f"task_{task_id}"] = by_warehouse
 
     with open(f"{out_prefix}_master.json", "w") as f:
         json.dump(master_archive, f, indent=4, ensure_ascii=False)
@@ -271,8 +282,8 @@ def main(orders_path, warehouses_path, transport_path, out_prefix, max_k=5, verb
 if __name__ == "__main__":
     import sys
     main(
-        "data/orders.csv",
-        "data/warehouses.csv",
-        "data/transport_types.csv",
+        "../data/large/orders-L.csv",
+        "../data/large/warehouses-L.csv",
+        "../data/transport_types.csv",
         "ilp",
     )
