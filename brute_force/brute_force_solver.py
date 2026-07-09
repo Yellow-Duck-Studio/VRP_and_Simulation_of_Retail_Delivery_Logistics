@@ -221,7 +221,7 @@ def build_master_archive(results):
             continue
         master_archive[f"task_{task_id}"] = by_warehouse
 
-    with open("data/master_clusterizations_bruteforce.json", "w") as f:
+    with open("../data/master_clusterizations_bruteforce.json", "w") as f:
         json.dump(master_archive, f, indent=4, ensure_ascii=False)
 
     return master_archive
@@ -229,7 +229,7 @@ def build_master_archive(results):
 
 def main():
     orders, warehouses, transports = load_data(
-        "data/orders.csv",
+        "../data/small/orders.csv",
         "data/warehouses.csv",
         "data/transport_types.csv",
     )
@@ -267,7 +267,7 @@ def main():
                 "status": "ok"
             })
 
-    with open("data/optimal_clusterizations.json", "w") as f:
+    with open("../data/optimal_clusterizations.json", "w") as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
 
     summary_df = pd.DataFrame(summary_rows)
