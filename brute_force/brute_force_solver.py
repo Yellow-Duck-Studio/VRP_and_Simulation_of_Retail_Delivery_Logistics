@@ -47,8 +47,14 @@ def parse_dt(s):
 
 
 def load_data(orders_path, warehouses_path, transport_path):
-    orders = pd.read_csv(orders_path)
-    warehouses = pd.read_csv(warehouses_path)
+    # task_id/warehouse_id/order_id forced to str at load time -- otherwise
+    # pandas silently upcasts these ID columns to float64 (e.g. "1" -> 1.0)
+    # if it encounters any NaN in the column, which corrupts the string keys
+    # written into master_clusterizations_bruteforce.json (e.g. "1.0" instead
+    # of "1") and breaks lookups in io_utils.py's _match_solution.
+    id_dtypes = {"task_id": str, "warehouse_id": str}
+    orders = pd.read_csv(orders_path, dtype={**id_dtypes, "order_id": str})
+    warehouses = pd.read_csv(warehouses_path, dtype=id_dtypes)
     transports = pd.read_csv(transport_path)
 
     orders["pickup_ready_at"] = orders["pickup_ready_at"].apply(parse_dt)
@@ -188,31 +194,32 @@ def solve_warehouse(order_rows, wh_lat, wh_lon, transports, max_cluster_size=5):
 
 def build_master_archive(results):
     """
-    Convert our per-warehouse optimal solutions into the same JSON format
-    produced by main.py's evolutionary pipeline:
-        { "task_1": [ [ [order_id, ...], [order_id, ...], ... ] ], ... }
-    Each task maps to a list of candidate configurations; since this is the
-    exact optimum we store a single (best possible) configuration per task.
-    A configuration is a flat list of trips (one trip = list of order_ids),
-    combining trips from every warehouse of that task (warehouses are never
-    mixed within a trip, so concatenating each warehouse's optimal trips
-    yields the task-optimal configuration).
+    Convert our per-warehouse optimal solutions into a master archive that
+    keeps warehouse boundaries intact:
+        { "task_1": { "1": [ [order_id, ...], ... ],   # warehouse_id -> trips
+                       "2": [ [order_id, ...], ... ] },
+          ... }
+    order_id is only unique WITHIN a task (it resets/repeats across tasks),
+    so trips must stay grouped by warehouse_id here rather than being
+    flattened -- otherwise downstream consumers (e.g. infer.py's per-
+    warehouse comparison against ground truth) have no way to recover which
+    warehouse a trip belongs to.
     """
     master_archive = {}
     for task_id, wh_results in results.items():
-        trips = []
+        by_warehouse = {}
         any_infeasible = False
         for wh_id, sol in wh_results.items():
             if sol is None:
                 any_infeasible = True
                 continue
-            for cluster in sol["clusters"]:
-                trips.append([int(oid) for oid in cluster["order_ids"]])
+            trips = [[int(oid) for oid in cluster["order_ids"]] for cluster in sol["clusters"]]
+            by_warehouse[str(wh_id)] = trips
         if any_infeasible:
             print(f"WARNING: task {task_id} has an infeasible warehouse; "
                   f"skipped from master archive.")
             continue
-        master_archive[f"task_{task_id}"] = [trips]  # single optimal configuration
+        master_archive[f"task_{task_id}"] = by_warehouse
 
     with open("../data/master_clusterizations_bruteforce.json", "w") as f:
         json.dump(master_archive, f, indent=4, ensure_ascii=False)

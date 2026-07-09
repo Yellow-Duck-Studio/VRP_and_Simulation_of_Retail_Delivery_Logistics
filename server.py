@@ -1,4 +1,5 @@
 import asyncio
+import glob
 import subprocess
 import json
 import os
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -153,11 +154,36 @@ async def run_clustering_ws(websocket: WebSocket):
             pass
 
 
+class SimulationConfig(BaseModel):
+    input: Optional[str] = "test_data_innopolis.json"
+    time_step: Optional[int] = 5
+    max_steps: Optional[int] = 100
+    strict: Optional[bool] = False
+
+
+@app.get("/api/simulate/inputs")
+async def list_simulation_inputs():
+    pattern = os.path.join("simulator", "test_data*.json")
+    files = sorted(os.path.basename(p) for p in glob.glob(pattern))
+    if not files:
+        files = ["test_data_innopolis.json"]
+    return {"inputs": files}
+
+
 @app.post("/api/simulate")
-async def run_simulation():
+async def run_simulation(config: SimulationConfig = SimulationConfig()):
+    args = [
+        "python3", "-m", "simulator.main",
+        "--input", config.input or "test_data_innopolis.json",
+        "--time-step", str(config.time_step or 5),
+        "--max-steps", str(config.max_steps or 100),
+    ]
+    if config.strict:
+        args.append("--strict")
+
     try:
         result = subprocess.run(
-            ["python3", "-m", "simulator.main"],
+            args,
             capture_output=True,
             text=True,
             check=True,
@@ -165,7 +191,8 @@ async def run_simulation():
         )
         return PlainTextResponse(result.stdout)
     except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=e.stderr or e.stdout)
+        detail = (e.stderr or "").strip() or (e.stdout or "").strip() or f"Simulation exited with code {e.returncode}"
+        raise HTTPException(status_code=500, detail=detail)
 
 
 app.mount("/data", StaticFiles(directory="data"), name="data")

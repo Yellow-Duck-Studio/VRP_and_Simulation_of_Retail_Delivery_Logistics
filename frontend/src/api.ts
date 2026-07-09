@@ -205,9 +205,31 @@ export function runClusteringWithProgress(
   });
 }
 
-export async function runSimulation(): Promise<string> {
+export interface SimulationConfig {
+  input?: string;
+  time_step?: number;
+  max_steps?: number;
+  strict?: boolean;
+}
+
+export async function listSimulationInputs(): Promise<string[]> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/simulate/inputs`);
+    if (!response.ok) return ["test_data_innopolis.json"];
+    const data = await response.json();
+    return data.inputs?.length ? data.inputs : ["test_data_innopolis.json"];
+  } catch {
+    return ["test_data_innopolis.json"];
+  }
+}
+
+export async function runSimulation(config: SimulationConfig = {}): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/simulate`, {
     method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(config),
   });
 
   if (!response.ok) {
