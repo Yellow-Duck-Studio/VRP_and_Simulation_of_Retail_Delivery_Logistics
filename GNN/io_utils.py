@@ -36,10 +36,10 @@ class TransportTariff:
     code: str
     approx_speed_kmh: float
     max_payload_kg: float
-    fixed_fee: float
-    per_km_fee: float
-    per_order_fee: float
-    per_kg_min_fee: float
+    fixed_fee: float = 0.0
+    per_km_fee: float = 0.0
+    per_order_fee: float = 0.0
+    per_kg_min_fee: float = 0.0
 
 
 @dataclass
@@ -53,16 +53,52 @@ class WarehouseInstance:
 
 
 def load_transport_types(path: str) -> List[TransportTariff]:
+    return load_transport_types_with_optional_couriers(path, couriers_csv=None)
+
+
+def _aggregate_courier_fees(couriers_csv: str) -> dict[str, dict[str, float]]:
+    couriers_df = pd.read_csv(couriers_csv)
+    fee_columns = {"per_km_fee", "per_order_fee"}
+    if not fee_columns.issubset(couriers_df.columns):
+        return {}
+
+    transport_column = "transport_type_normalized" if "transport_type_normalized" in couriers_df.columns else "transport_type"
+    alias_map = {
+        "moped": "bike",
+        "walking": "foot",
+    }
+
+    grouped = (
+        couriers_df.groupby(transport_column, dropna=False)[["per_km_fee", "per_order_fee"]]
+        .mean()
+        .reset_index()
+    )
+
+    result: dict[str, dict[str, float]] = {}
+    for row in grouped.itertuples():
+        transport_key = alias_map.get(str(getattr(row, transport_column)), str(getattr(row, transport_column)))
+        result[transport_key] = {
+            "per_km_fee": float(row.per_km_fee),
+            "per_order_fee": float(row.per_order_fee),
+        }
+    return result
+
+
+def load_transport_types_with_optional_couriers(
+    path: str,
+    couriers_csv: Optional[str] = None,
+) -> List[TransportTariff]:
     df = pd.read_csv(path)
+    courier_fees = _aggregate_courier_fees(couriers_csv) if couriers_csv else {}
     return [
         TransportTariff(
             code=str(row.code),
             approx_speed_kmh=float(row.approx_speed_kmh),
             max_payload_kg=float(row.max_payload_kg),
-            fixed_fee=float(row.fixed_fee),
-            per_km_fee=float(row.per_km_fee),
-            per_order_fee=float(row.per_order_fee),
-            per_kg_min_fee=float(row.per_kg_min_fee),
+            fixed_fee=float(getattr(row, "fixed_fee", 0.0)),
+            per_km_fee=float(getattr(row, "per_km_fee", courier_fees.get(str(row.code), {}).get("per_km_fee", 0.0))),
+            per_order_fee=float(getattr(row, "per_order_fee", courier_fees.get(str(row.code), {}).get("per_order_fee", 0.0))),
+            per_kg_min_fee=float(getattr(row, "per_kg_min_fee", 0.0)),
         )
         for row in df.itertuples()
     ]
@@ -99,6 +135,10 @@ def load_instances(
 ) -> List[WarehouseInstance]:
     wh_df = pd.read_csv(warehouses_csv, dtype={"task_id": str, "warehouse_id": str})
     orders_df = pd.read_csv(orders_csv, dtype={"task_id": str, "warehouse_id": str, "order_id": str})
+    orders_by_key = {
+        key: group
+        for key, group in orders_df.groupby(["task_id", "warehouse_id"], sort=False)
+    }
 
     solutions_raw = {}
     if solutions_json:
@@ -112,10 +152,8 @@ def load_instances(
 
         for w_idx, warehouse_id in enumerate(warehouse_ids_sorted):
             wh_row = wh_task_df[wh_task_df["warehouse_id"] == warehouse_id].iloc[0]
-            order_rows = orders_df[
-                (orders_df["task_id"] == task_id) & (orders_df["warehouse_id"] == warehouse_id)
-            ]
-            if order_rows.empty:
+            order_rows = orders_by_key.get((task_id, warehouse_id))
+            if order_rows is None or order_rows.empty:
                 continue
             orders = [_order_row_to_dict(r) for r in order_rows.itertuples()]
 

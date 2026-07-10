@@ -1,0 +1,51 @@
+[
+  {
+    "source": "bruteforce",
+    "total_cost": 70646.9406,
+    "feasible_units": 10,
+    "total_units": 10,
+    "notes": ""
+  },
+  {
+    "source": "gnn",
+    "total_cost": 90476.7126,
+    "feasible_units": 51,
+    "total_units": 51,
+    "notes": "units = warehouses"
+  },
+  {
+    "source": "clarke_wright",
+    "total_cost": 101644.0538,
+    "feasible_units": 10,
+    "total_units": 10,
+    "notes": ""
+  },
+  {
+    "source": "dbscan",
+    "total_cost": 78387.9095,
+    "feasible_units": 10,
+    "total_units": 10,
+    "notes": ""
+  },
+  {
+    "source": "destroy_repair",
+    "total_cost": 31485.4136,
+    "feasible_units": 3,
+    "total_units": 10,
+    "notes": "invalid tasks: 3, 4, 5, 6, 7, 9, 10"
+  },
+  {
+    "source": "random",
+    "total_cost": 90900.2036,
+    "feasible_units": 8,
+    "total_units": 10,
+    "notes": "invalid tasks: 3, 7"
+  },
+  {
+    "source": "sweep",
+    "total_cost": 93509.4588,
+    "feasible_units": 10,
+    "total_units": 10,
+    "notes": ""
+  }
+]

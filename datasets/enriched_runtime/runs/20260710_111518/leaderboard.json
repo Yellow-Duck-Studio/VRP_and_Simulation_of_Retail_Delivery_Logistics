@@ -1,0 +1,12 @@
+[
+  {
+    "algorithm": "clarke_wright",
+    "total_tasks": 10,
+    "total_clusterizations": 10,
+    "valid_clusterizations": 3,
+    "best_fitness_score": 106.9927425977722,
+    "average_fitness_score": 908.7267863743828,
+    "output_json": "datasets\\enriched_runtime\\runs\\20260710_111518\\clarke_wright\\master_clusterizations.json",
+    "output_csv": "datasets\\enriched_runtime\\runs\\20260710_111518\\clarke_wright\\master_clusterizations.csv"
+  }
+]

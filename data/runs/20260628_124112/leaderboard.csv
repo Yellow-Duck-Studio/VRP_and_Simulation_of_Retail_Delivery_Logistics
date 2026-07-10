@@ -1,0 +1,6 @@
+run_id,label,algorithm,fitness_version,total_tasks,total_clusterizations,valid_clusterizations,best_fitness_score,average_fitness_score,output_json,output_csv
+20260628_124112,june_suite,dbscan,business_v1,10,12846,12846,57.085357660779756,82.89547915111132,data\runs\20260628_124112\dbscan\master_clusterizations.json,data\runs\20260628_124112\dbscan\master_clusterizations.csv
+20260628_124112,june_suite,sweep,business_v1,10,13112,13112,49.83782595816975,83.9931330642203,data\runs\20260628_124112\sweep\master_clusterizations.json,data\runs\20260628_124112\sweep\master_clusterizations.csv
+20260628_124112,june_suite,clarke_wright,business_v1,10,11909,11909,49.06111313854707,84.48704683464952,data\runs\20260628_124112\clarke_wright\master_clusterizations.json,data\runs\20260628_124112\clarke_wright\master_clusterizations.csv
+20260628_124112,june_suite,destroy_repair,business_v1,10,17339,17339,54.899215509892585,93.5347519717589,data\runs\20260628_124112\destroy_repair\master_clusterizations.json,data\runs\20260628_124112\destroy_repair\master_clusterizations.csv
+20260628_124112,june_suite,random,business_v1,10,17950,17950,57.56259958182331,93.9337341408627,data\runs\20260628_124112\random\master_clusterizations.json,data\runs\20260628_124112\random\master_clusterizations.csv

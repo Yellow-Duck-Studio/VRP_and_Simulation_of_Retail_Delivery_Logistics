@@ -1,0 +1,9 @@
+[
+  {
+    "source": "destroy_repair",
+    "total_cost": null,
+    "feasible_units": 0,
+    "total_units": 10,
+    "notes": "invalid tasks: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10"
+  }
+]

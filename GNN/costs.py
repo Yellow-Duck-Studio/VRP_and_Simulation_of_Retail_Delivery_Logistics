@@ -29,6 +29,18 @@ from geo import haversine_km
 from io_utils import TransportTariff
 
 
+def _uses_economic_tariffs(tariff: TransportTariff) -> bool:
+    return any(
+        value != 0.0
+        for value in (
+            tariff.fixed_fee,
+            tariff.per_km_fee,
+            tariff.per_order_fee,
+            tariff.per_kg_min_fee,
+        )
+    )
+
+
 def best_route_for_transport(
     warehouse_lat: float,
     warehouse_lon: float,
@@ -67,12 +79,18 @@ def best_route_for_transport(
         total_time_min = (cur_time - start_time).total_seconds() / 60.0
         kg_min = total_mass * total_time_min  # см. допущение в docstring
 
-        cost = (
-            tariff.fixed_fee
-            + tariff.per_km_fee * total_dist
-            + tariff.per_order_fee * n
-            + tariff.per_kg_min_fee * kg_min
-        )
+        if _uses_economic_tariffs(tariff):
+            cost = (
+                tariff.fixed_fee
+                + tariff.per_km_fee * total_dist
+                + tariff.per_order_fee * n
+                + tariff.per_kg_min_fee * kg_min
+            )
+        else:
+            # New datasets may omit tariff economics columns entirely.
+            # In that case we fall back to a time-based surrogate so the
+            # decoder can still choose between feasible route variants.
+            cost = total_time_min + (0.01 * total_dist) + (0.001 * kg_min)
         if best is None or cost < best["cost"]:
             best = {
                 "cost": cost,

@@ -1,0 +1,52 @@
+[
+  {
+    "algorithm": "dbscan",
+    "total_tasks": 10,
+    "total_clusterizations": 110,
+    "valid_clusterizations": 110,
+    "best_fitness_score": 59.69164832687488,
+    "average_fitness_score": 89.98261416538203,
+    "output_json": "data\\runs\\20260707_205620\\dbscan\\master_clusterizations.json",
+    "output_csv": "data\\runs\\20260707_205620\\dbscan\\master_clusterizations.csv"
+  },
+  {
+    "algorithm": "sweep",
+    "total_tasks": 10,
+    "total_clusterizations": 271,
+    "valid_clusterizations": 21,
+    "best_fitness_score": 54.14494314952519,
+    "average_fitness_score": 24127.45517973104,
+    "output_json": "data\\runs\\20260707_205620\\sweep\\master_clusterizations.json",
+    "output_csv": "data\\runs\\20260707_205620\\sweep\\master_clusterizations.csv"
+  },
+  {
+    "algorithm": "clarke_wright",
+    "total_tasks": 10,
+    "total_clusterizations": 10,
+    "valid_clusterizations": 3,
+    "best_fitness_score": 60.03589858983953,
+    "average_fitness_score": 575.5539445071678,
+    "output_json": "data\\runs\\20260707_205620\\clarke_wright\\master_clusterizations.json",
+    "output_csv": "data\\runs\\20260707_205620\\clarke_wright\\master_clusterizations.csv"
+  },
+  {
+    "algorithm": "destroy_repair",
+    "total_tasks": 10,
+    "total_clusterizations": 2,
+    "valid_clusterizations": 2,
+    "best_fitness_score": 97.22171807497081,
+    "average_fitness_score": 97.93013157340587,
+    "output_json": "data\\runs\\20260707_205620\\destroy_repair\\master_clusterizations.json",
+    "output_csv": "data\\runs\\20260707_205620\\destroy_repair\\master_clusterizations.csv"
+  },
+  {
+    "algorithm": "random",
+    "total_tasks": 10,
+    "total_clusterizations": 451,
+    "valid_clusterizations": 1,
+    "best_fitness_score": 84.12768487385931,
+    "average_fitness_score": 37410.072532767175,
+    "output_json": "data\\runs\\20260707_205620\\random\\master_clusterizations.json",
+    "output_csv": "data\\runs\\20260707_205620\\random\\master_clusterizations.csv"
+  }
+]

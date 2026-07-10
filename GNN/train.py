@@ -6,7 +6,7 @@ import torch.nn as nn
 from torch_geometric.loader import DataLoader
 
 from config import LR, WEIGHT_DECAY, EPOCHS, BATCH_SIZE, POS_WEIGHT, GRAD_CLIP, DEVICE, SEED
-from io_utils import load_instances, load_transport_types
+from io_utils import load_instances, load_transport_types_with_optional_couriers
 from data import WarehouseGraphDataset
 from model import ClusteringGNN
 
@@ -32,11 +32,11 @@ def evaluate(model, loader, device):
     return total_loss / max(total_edges, 1), correct / max(total_edges, 1)
 
 
-def train(warehouses_csv, orders_csv, transport_csv, solutions_json, out_path="model.pt"):
+def train(warehouses_csv, orders_csv, transport_csv, solutions_json, out_path="model.pt", couriers_csv=None):
     set_seed(SEED)
     device = torch.device(DEVICE if torch.cuda.is_available() else "cpu")
 
-    tariffs = load_transport_types(transport_csv)
+    tariffs = load_transport_types_with_optional_couriers(transport_csv, couriers_csv=couriers_csv)
     min_capacity_kg = min(t.max_payload_kg for t in tariffs)
 
     instances = load_instances(warehouses_csv, orders_csv, solutions_json)
@@ -91,6 +91,7 @@ if __name__ == "__main__":
     parser.add_argument("--orders", required=True)
     parser.add_argument("--transport", required=True)
     parser.add_argument("--solutions", required=True)
+    parser.add_argument("--couriers", default=None)
     parser.add_argument("--out", default="model.pt")
     args = parser.parse_args()
-    train(args.warehouses, args.orders, args.transport, args.solutions, args.out)
+    train(args.warehouses, args.orders, args.transport, args.solutions, args.out, args.couriers)

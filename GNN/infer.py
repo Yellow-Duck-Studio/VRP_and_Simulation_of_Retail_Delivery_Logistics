@@ -4,16 +4,16 @@ import time
 import torch
 
 from config import DEVICE
-from io_utils import load_instances, load_transport_types
+from io_utils import load_instances, load_transport_types_with_optional_couriers
 from data import build_graph, normalize_edge_mass
 from model import ClusteringGNN
 from decode import decode
 from costs import clustering_total_cost
 
 
-def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path, limit=None):
+def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path, limit=None, couriers_csv=None):
     device = torch.device(DEVICE if torch.cuda.is_available() else "cpu")
-    tariffs = load_transport_types(transport_csv)
+    tariffs = load_transport_types_with_optional_couriers(transport_csv, couriers_csv=couriers_csv)
     min_capacity_kg = min(t.max_payload_kg for t in tariffs)
 
     model = ClusteringGNN().to(device)
@@ -46,7 +46,7 @@ def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path, l
             inst.warehouse_lat, inst.warehouse_lon, orders_by_id, pred_clusters, tariffs
         )
         if pred_cost is None:
-            print(f"[task {inst.task_id} wh {inst.warehouse_id}] INFEASIBLE prediction (баг в decode/repair)")
+            print(f"[task {inst.task_id} wh {inst.warehouse_id}] INFEASIBLE prediction (decode/repair issue)")
             continue
         n_feasible += 1
 
@@ -69,8 +69,9 @@ if __name__ == "__main__":
     parser.add_argument("--warehouses", required=True)
     parser.add_argument("--orders", required=True)
     parser.add_argument("--transport", required=True)
-    parser.add_argument("--solutions", default=None, help="опционально: solutions.json для сравнения с оптимумом солвера")
+    parser.add_argument("--solutions", default=None, help="Optional solutions.json for comparison against a reference partition.")
+    parser.add_argument("--couriers", default=None)
     parser.add_argument("--model", default="model.pt")
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
-    run(args.warehouses, args.orders, args.transport, args.solutions, args.model, args.limit)
+    run(args.warehouses, args.orders, args.transport, args.solutions, args.model, args.limit, args.couriers)
