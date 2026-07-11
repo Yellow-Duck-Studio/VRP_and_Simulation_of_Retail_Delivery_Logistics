@@ -115,7 +115,7 @@ if __name__ == "__main__":
     parser.add_argument("--orders", required=False, default="data/large/orders-L.csv",)
     parser.add_argument("--transport", required=False, default="data/transport_types.csv",)
     parser.add_argument("--solutions", default="data/large/ilp_master.json", help="опционально: solutions.json для сравнения с оптимумом солвера")
-    parser.add_argument("--model", default="model.pt")
+    parser.add_argument("--model", default="GNN/model.pt")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--report", default="comparison_report.csv",
                         help="path to write the detailed per-warehouse comparison CSV")
