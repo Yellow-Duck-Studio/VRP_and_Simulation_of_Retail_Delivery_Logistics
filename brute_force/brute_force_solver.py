@@ -14,10 +14,16 @@ cost multiple times across different partitions.
 Cost model (matches the Kaggle checker exactly):
     cost = fixed_fee + per_km_fee * route_distance
                       + per_order_fee * order_count
-                      + per_kg_min_fee * route_kg   (route_kg = sum of masses)
+                      + per_kg_min_fee * route_kg_min
 
-route_distance = sum of Haversine legs: warehouse -> order_1 -> ... -> order_k
-                 (no return trip to warehouse)
+route_distance  = sum of Haversine legs: warehouse -> order_1 -> ... -> order_k
+                  (no return trip to warehouse)
+route_kg_min    = sum over legs of (minutes_to_reach_order * remaining_mass),
+                  where remaining_mass is the mass of all orders NOT YET
+                  delivered at the start of that leg (it decreases after each
+                  delivery -- the courier only pays kg*min for the weight
+                  they are still carrying, not the full cluster mass for the
+                  whole route)
 departure time  = max(pickup_ready_at) over all orders in the cluster
 feasibility     = cluster weight <= transport max_payload_kg
                   AND arrival time at every order <= its delivery_deadline_at
@@ -90,17 +96,32 @@ def best_cluster_cost(order_rows, wh_lat, wh_lon, transports, max_cluster_size=5
             cur_lat, cur_lon = wh_lat, wh_lon
             cur_time = start_time
             total_dist = 0.0
+            total_kg_min = 0.0
+            # Вес, который курьер ещё везёт (уменьшается после каждой доставки).
+            # Заказчик подтвердил: курьер платит по кг*мин за ЕЩЁ недоставленный
+            # груз на каждом участке маршрута, поэтому remaining_mass должен
+            # падать по мере доставки заказов, а не оставаться равным total_mass
+            # на всём пути.
+            remaining_mass = total_mass
             feasible = True
             for o in perm:
                 d = haversine(cur_lat, cur_lon, o["order_lat"], o["order_lon"])
                 total_dist += d
                 travel_hours = d / speed
+                minutes_to_order = travel_hours * 60.0
                 arrival = cur_time + pd.Timedelta(hours=travel_hours)
                 if arrival > o["delivery_deadline_at"]:
                     feasible = False
                     break
+
+                # На этом участке курьер везёт все ещё недоставленные заказы.
+                total_kg_min += minutes_to_order * remaining_mass
+
                 cur_time = arrival
                 cur_lat, cur_lon = o["order_lat"], o["order_lon"]
+                # После доставки текущего заказа его вес больше не влияет
+                # на следующие участки.
+                remaining_mass -= o["total_mass_kg"]
 
             if not feasible:
                 continue
@@ -108,7 +129,7 @@ def best_cluster_cost(order_rows, wh_lat, wh_lon, transports, max_cluster_size=5
             cost = (t["fixed_fee"]
                     + t["per_km_fee"] * total_dist
                     + t["per_order_fee"] * k
-                    + t["per_kg_min_fee"] * total_mass)
+                    + t["per_kg_min_fee"] * total_kg_min)
 
             if best_cost is None or cost < best_cost - 1e-9:
                 best_cost = cost

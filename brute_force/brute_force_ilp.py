@@ -17,7 +17,10 @@ much larger per-warehouse order counts (e.g. 30 orders/warehouse), by:
      the bitmask DP (which needs 2^n states and can't handle n=30) with an
      ILP formulation of the identical problem.
 
-Cost model, feasibility rules, etc. are unchanged from brute_force_solver.py.
+Cost model, feasibility rules, etc. match brute_force_solver.py, including
+the kg*min term: the courier only pays per_kg_min_fee for the mass it is
+still carrying on each leg, so remaining mass decreases after every
+delivery instead of staying at the full cluster mass for the whole route.
 """
 
 import numpy as np
@@ -116,6 +119,20 @@ def enumerate_candidate_clusters(order_ids, lat, lon, pickup_ready_epoch, deadli
 
         deadline_per_pos = [deadline_epoch[seq_idx[:, :, i]] for i in range(k)]
 
+        # Mass of the order being delivered at each position (transport
+        # independent), plus how much mass has already been delivered BEFORE
+        # reaching that position. remaining_mass_at_leg_i = mass_combo minus
+        # everything already dropped off in positions 0..i-1. This mirrors
+        # the customer's route_stats(): the courier only pays kg*min for
+        # cargo it is still carrying, so weight shrinks after each delivery
+        # instead of staying at the full cluster mass for the whole route.
+        mass_per_pos = [mass[seq_idx[:, :, i]] for i in range(k)]
+        delivered_before_pos = []
+        cum_delivered = np.zeros((n_comb, n_perm), dtype=np.float64)
+        for i in range(k):
+            delivered_before_pos.append(cum_delivered.copy())
+            cum_delivered = cum_delivered + mass_per_pos[i]
+
         for t_idx, t in enumerate(transports):
             mass_ok = mass_combo <= t["max_payload_kg"] + 1e-9  # (n_comb,)
             if not mass_ok.any():
@@ -129,10 +146,22 @@ def enumerate_candidate_clusters(order_ids, lat, lon, pickup_ready_epoch, deadli
 
             feasible &= mass_ok[:, None]
 
+            # kg*min term: sum over legs of (leg_minutes * remaining_mass),
+            # where remaining_mass = mass_combo - delivered_before_pos[i]
+            # (mass not yet dropped off before this leg starts). Speed
+            # depends on transport, so this has to be recomputed per
+            # transport rather than reusing a single transport-independent
+            # value like total_dist.
+            kg_min_total = np.zeros((n_comb, n_perm), dtype=np.float64)
+            for i in range(k):
+                leg_minutes = (leg_list[i].astype(np.float64) / speed) * 60.0
+                remaining_mass_i = mass_combo[:, None] - delivered_before_pos[i]
+                kg_min_total += leg_minutes * remaining_mass_i
+
             cost = (t["fixed_fee"]
                     + t["per_km_fee"] * total_dist.astype(np.float64)
                     + t["per_order_fee"] * k
-                    + t["per_kg_min_fee"] * mass_combo[:, None])
+                    + t["per_kg_min_fee"] * kg_min_total)
             cost = np.where(feasible, cost, np.inf)
 
             perm_best_idx = np.argmin(cost, axis=1)
