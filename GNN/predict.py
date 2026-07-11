@@ -118,9 +118,9 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--warehouses", required=True)
-    parser.add_argument("--orders", required=True)
-    parser.add_argument("--transport", required=True)
+    parser.add_argument("--warehouses", required=False, default="data/large/warehouses-L.csv", )
+    parser.add_argument("--orders", required=False, default="data/large/orders-L.csv", )
+    parser.add_argument("--transport", required=False, default="data/transport_types.csv", )
     parser.add_argument("--model", default="model.pt")
     parser.add_argument("--out", default="predictions.json")
     parser.add_argument("--limit", type=int, default=None)
