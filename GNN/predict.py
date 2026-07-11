@@ -121,7 +121,7 @@ if __name__ == "__main__":
     parser.add_argument("--warehouses", required=True)
     parser.add_argument("--orders", required=True)
     parser.add_argument("--transport", required=True)
-    parser.add_argument("--model", default="model.pt")
+    parser.add_argument("--model", default="GNN/model.pt")
     parser.add_argument("--out", default="predictions.json")
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
