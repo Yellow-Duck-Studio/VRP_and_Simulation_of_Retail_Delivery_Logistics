@@ -1,12 +1,14 @@
 """
 cost = fixed_fee + per_km_fee * route_distance_km
                   + per_order_fee * order_count
-                  + per_kg_min_fee * total_mass_kg
+                  + per_kg_min_fee * route_kg_min
 
-Confirmed against the checker: per_kg_min_fee multiplies total cluster mass
-only (NOT mass * route duration, despite the "_min" in the name). Route
-duration is still tracked (best["duration_min"]) since it's useful for
-feasibility/debugging, but it no longer enters the cost formula.
+route_kg_min = sum over legs of (leg_duration_min * remaining_mass_kg),
+where remaining_mass_kg is the mass of all orders NOT YET delivered at the
+start of that leg. It starts at total_mass_kg and decreases after each
+delivery -- the courier only pays kg*min for the cargo it is still
+carrying, not the full cluster mass for the whole route (confirmed against
+the checker's route_stats()).
 
 Проверка допустимости кластера для тарифа:
   - все заказы одного типа транспорта (это гарантируется тем, что мы
@@ -50,17 +52,25 @@ def best_route_for_transport(
         cur_lat, cur_lon = warehouse_lat, warehouse_lon
         cur_time = start_time
         total_dist = 0.0
+        kg_min = 0.0
+        # Масса, которую курьер ещё везёт (не выгруженную к началу текущего
+        # участка). Убывает после каждой доставки -- курьер платит по
+        # кг*мин только за груз, который всё ещё у него на руках.
+        remaining_mass = total_mass
         feasible = True
         for idx in perm:
             o = orders[idx]
             d = haversine_km(cur_lat, cur_lon, o["lat"], o["lon"])
             total_dist += d
             travel_min = d / tariff.approx_speed_kmh * 60.0
+            # На этом участке курьер везёт remaining_mass (ещё недоставленный груз).
+            kg_min += travel_min * remaining_mass
             cur_time = cur_time + pd.Timedelta(minutes=travel_min)
             if cur_time > o["delivery_deadline_at"]:
                 feasible = False
                 break
             cur_lat, cur_lon = o["lat"], o["lon"]
+            remaining_mass -= o["mass_kg"]
         if not feasible:
             continue
 
@@ -70,7 +80,7 @@ def best_route_for_transport(
                 tariff.fixed_fee
                 + tariff.per_km_fee * total_dist
                 + tariff.per_order_fee * n
-                + tariff.per_kg_min_fee * total_mass
+                + tariff.per_kg_min_fee * kg_min
         )
         if best is None or cost < best["cost"]:
             best = {
