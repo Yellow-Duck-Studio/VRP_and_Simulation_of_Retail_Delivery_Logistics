@@ -17,13 +17,40 @@ export interface OrderInfo {
   weight: number;
 }
 
-type ClusteringVariant = number[][];
+export interface ClusterData {
+  cluster_id: number;
+  warehouse_id: number;
+  transport_type: string;
+  order_ids: number[];
+}
 
-type TaskClusters = ClusteringVariant[];
+export interface ClusterizationVariant {
+  clusterization_id: number;
+  fitness_score: number;
+  is_valid: boolean;
+  clusters: ClusterData[];
+}
 
-type AlgorithmResults = Record<string, TaskClusters>;
+export interface GnnClusterData {
+  order_ids: (string | number)[];
+  feasible: boolean;
+  transport: string;
+  order_sequence: (string | number)[];
+  distance_km: number;
+  duration_min: number;
+  cost: number;
+}
 
-type AllResults = Record<string, AlgorithmResults>;
+export interface GnnTaskResult {
+  task_id: string | number;
+  warehouse_id: string | number;
+  num_orders: number;
+  clusters: GnnClusterData[];
+}
+
+export type AlgorithmResults = Record<string, ClusterizationVariant[]> | GnnTaskResult[];
+
+export type AllResults = Record<string, AlgorithmResults>;
 
 // IMPORTANT: order_id in orders.csv is unique only WITHIN a single task_id
 // (polygon), not globally. The same order_id appears across many different
@@ -63,7 +90,22 @@ export const API_BASE_URL = `${API_BASE}/api`;
 export const DATA_BASE_URL = API_BASE || "";
 export const WS_BASE_URL = API_BASE ? API_BASE.replace(/^http/, "ws") : "";
 
-export async function loadOrdersDataset(csvUrl: string = `${DATA_BASE_URL}/data/small/orders.csv`): Promise<void> {
+export const DATASET_MAPPING = {
+  small: {
+    orders: `${DATA_BASE_URL}/data/small/orders.csv`,
+    warehouses: `${DATA_BASE_URL}/data/small/warehouses.csv`
+  },
+  large: {
+    orders: `${DATA_BASE_URL}/data/large/orders.csv`,
+    warehouses: `${DATA_BASE_URL}/data/large/warehouses.csv`
+  },
+  big: {
+    orders: `${DATA_BASE_URL}/data/big/orders-B.csv`,
+    warehouses: `${DATA_BASE_URL}/data/big/warehouses-B.csv`
+  }
+};
+
+export async function loadOrdersDataset(csvUrl: string): Promise<void> {
   try {
     const response = await fetch(csvUrl);
     const text = await response.text();
@@ -165,6 +207,7 @@ export interface ClusterProgressEvent {
  */
 export function runClusteringWithProgress(
   algorithms: string[],
+  dataset: string,
   onEvent: (event: ClusterProgressEvent) => void
 ): Promise<AllResults> {
   return new Promise((resolve, reject) => {
@@ -172,7 +215,7 @@ export function runClusteringWithProgress(
     const ws = new WebSocket(`${WS_BASE_URL}/ws/cluster`);
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ algorithms }));
+      ws.send(JSON.stringify({ algorithms, dataset }));
     };
 
     ws.onmessage = (event) => {

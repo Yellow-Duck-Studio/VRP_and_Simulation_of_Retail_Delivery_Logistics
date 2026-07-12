@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useId, useMemo, useRef, useState} from "react";
 import {
   DATA_BASE_URL,
+  DATASET_MAPPING,
   getOrder,
   getOrdersForTask,
   getWarehousesForTask,
@@ -13,8 +14,9 @@ import {
 import {MapIcon, MinusIcon, PlusIcon,} from '@heroicons/react/24/outline';
 
 export interface ClusterMapProps {
-  clusters: number[][];
+  clusters: Array<{ order_ids: number[]; order_sequence: number[] | null; transport_type?: string }>;
   taskId: number | string;
+  dataset: string;
   isRunning?: boolean;
 }
 
@@ -24,6 +26,7 @@ interface Point {
   y: number;
   clusterIdx: number;
   orderIdxInCluster: number;
+  transportType?: string;
 }
 
 interface WarehousePoint {
@@ -73,7 +76,7 @@ const formatTime = (isoString: string) => {
   }
 };
 
-export default function ClusterMap({ clusters, taskId, isRunning = false }: ClusterMapProps) {
+export default function ClusterMap({ clusters, taskId, dataset, isRunning = false }: ClusterMapProps) {
   const [dataLoaded, setDataLoaded] = useState(false);
   const [virtualDistance, setVirtualDistance] = useState(0);
   const [hoveredPoint, setHoveredPoint] = useState<Point | null>(null);
@@ -91,6 +94,23 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
   const transformStart = useRef({ x: 0, y: 0 });
 
   const arrowId = useId();
+
+  useEffect(() => {
+    const loadAll = async () => {
+      setDataLoaded(false);
+
+      const paths = DATASET_MAPPING[dataset as keyof typeof DATASET_MAPPING] || DATASET_MAPPING.small;
+
+      await Promise.all([
+        loadOrdersDataset(paths.orders),
+        loadWarehousesDataset(paths.warehouses)
+      ]);
+
+      setDataLoaded(true);
+    };
+
+    loadAll();
+  }, [dataset]);
 
   useEffect(() => {
     const loadAll = async () => {
@@ -179,32 +199,36 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
       .map(w => ({ id: w.id, ...project(w.lat, w.lon) }));
 
     return { positions: posMap, warehousePoints: whPoints };
-  }, [taskId]);
+  }, [taskId, dataset, dataLoaded]);
 
   const points: Point[] = useMemo(() => {
     const result: Point[] = [];
     let fallbackSpiralIdx = 0;
 
     clusters.forEach((cluster, ci) => {
-      cluster.forEach((rawId, orderIdx) => {
+      const rawIds = cluster.order_sequence || cluster.order_ids;
+      const orderIds = Array.isArray(rawIds) ? rawIds : (Array.isArray(cluster) ? cluster : []);
+      const transportType = cluster.transport_type;
+
+      orderIds.forEach((rawId, orderIdx) => {
         const id = Number(rawId);
         const pos = positions.get(id);
 
         if (pos && !isNaN(pos.x) && !isNaN(pos.y)) {
-          result.push({ id, x: pos.x, y: pos.y, clusterIdx: ci, orderIdxInCluster: orderIdx });
+          result.push({ id, x: pos.x, y: pos.y, clusterIdx: ci, orderIdxInCluster: orderIdx, transportType });
         } else {
           const r = 25 * Math.sqrt(fallbackSpiralIdx + 1);
           const theta = fallbackSpiralIdx * 137.508 * (Math.PI / 180);
           const x = VIEW_BOX_WIDTH / 2 + r * Math.cos(theta);
           const y = VIEW_BOX_HEIGHT / 2 + r * Math.sin(theta);
 
-          result.push({ id, x, y, clusterIdx: ci, orderIdxInCluster: orderIdx });
+          result.push({ id, x, y, clusterIdx: ci, orderIdxInCluster: orderIdx, transportType });
           fallbackSpiralIdx++;
         }
       });
     });
     return result;
-  }, [clusters, positions]);
+  }, [clusters, positions, dataLoaded]);
 
   const pointMap = useMemo(() => {
     const map = new Map<number, Point>();
@@ -584,8 +608,14 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
         </defs>
 
         <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
-          {hoveredClusterIdx !== null &&
-            clusters[hoveredClusterIdx].map((idStr, i, arr) => {
+          {hoveredClusterIdx !== null && (() => {
+            const cluster = clusters[hoveredClusterIdx];
+            const rawIds = cluster.order_sequence || cluster.order_ids;
+            const orderIds = Array.isArray(rawIds) ? rawIds : (Array.isArray(cluster) ? cluster : []);
+
+            if (!Array.isArray(orderIds) || orderIds.length === 0) return null;
+            
+            return orderIds.map((idStr, i, arr) => {
               if (i === arr.length - 1) return null;
               const from = pointMap.get(Number(idStr));
               const to = pointMap.get(Number(arr[i + 1]));
@@ -602,7 +632,8 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
                   markerEnd={`url(#${arrowId})`}
                 />
               );
-            })}
+            });
+          })()}
 
           {points.map((p) => {
             const isActiveCluster = hoveredClusterIdx !== null && p.clusterIdx === hoveredClusterIdx;
@@ -744,6 +775,12 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
           </div>
           {tooltipOrder ? (
             <div className="text-gray-600 space-y-1.5 text-xs">
+              {hoveredPoint.transportType && (
+                <div className="flex justify-between">
+                  <span className="font-medium">Transport:</span>
+                  <span className="capitalize font-semibold text-blue-600">{hoveredPoint.transportType}</span>
+                </div>
+              )}
               <div className="flex justify-between"><span className="font-medium">Mass:</span> <span>{tooltipOrder.weight} kg</span></div>
               <div className="flex justify-between"><span className="font-medium">Pickup:</span> <span>{formatTime(tooltipOrder.pickupReadyAt)}</span></div>
               <div className="flex justify-between text-red-600"><span className="font-medium">Deadline:</span> <span>{formatTime(tooltipOrder.deliveryDeadlineAt)}</span></div>

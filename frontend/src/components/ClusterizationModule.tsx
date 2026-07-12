@@ -4,7 +4,6 @@ import { runClusteringWithProgress, type ClusterProgressEvent } from "../api.ts"
 import ClusterMapCanvas from "./ClusterMapCanvas";
 
 const AVAILABLE_EVO_ALGORITHMS = ["DBScan", "Clarke Wright", "Sweep", "Destroy & Repair", "Random"];
-
 const AVAILABLE_STANDALONE_ALGORITHMS = ["GNN"];
 
 function RunLogPanel({ lines, active }: { lines: string[]; active: boolean }) {
@@ -24,7 +23,7 @@ function RunLogPanel({ lines, active }: { lines: string[]; active: boolean }) {
           {active ? "running..." : "in queue"}
         </span>
       </div>
-      <div ref={scrollRef} className=" text-[11px] font-mono leading-relaxed p-3 h-40 overflow-y-auto">
+      <div ref={scrollRef} className="text-[11px] font-mono leading-relaxed p-3 h-40 overflow-y-auto">
         {lines.length === 0 ? (
           <div className="text-gray-500">Wait for output...</div>
         ) : (
@@ -51,12 +50,77 @@ function RunLogPanel({ lines, active }: { lines: string[]; active: boolean }) {
   );
 }
 
+const sortTaskKeys = (keys: string[]) => {
+  return [...keys].sort((a, b) => {
+    const numA = parseInt(a.replace(/\D/g, "")) || 0;
+    const numB = parseInt(b.replace(/\D/g, "")) || 0;
+    return numA - numB;
+  });
+};
+
+const getTasksFromAlgoData = (algoData: any): string[] => {
+  if (!algoData) return [];
+  if (Array.isArray(algoData)) {
+    const keys = algoData.map((item: any) => {
+      const id = item.task_id;
+      return typeof id === "string" && id.startsWith("task_") ? id : `task_${id}`;
+    });
+    return sortTaskKeys([...new Set(keys)]);
+  }
+  return sortTaskKeys(Object.keys(algoData));
+};
+
+const getVariantsFromAlgoData = (algoData: any, taskKey: string): any[] => {
+  if (!algoData || !taskKey) return [];
+
+  if (Array.isArray(algoData)) {
+    const rawId = taskKey.replace("task_", "");
+    const allFound = algoData.filter(
+      (item: any) => String(item.task_id) === taskKey || String(item.task_id) === rawId
+    );
+
+    if (allFound.length === 0) return [];
+
+    const mergedClusters = allFound.flatMap((item: any) =>
+      item.clusters.map((c: any) => {
+        const sequence = c.order_sequence || c.order_ids || [];
+
+        return {
+          order_ids: sequence.map((id: any) => Number(id)),
+          transport_type: c.transport || "unknown",
+          warehouse_id: item.warehouse_id
+        };
+      })
+    );
+
+    const totalScore = allFound.reduce((acc, item) =>
+      acc + item.clusters.reduce((cAcc: number, c: any) => cAcc + (c.cost || 0), 0)
+    , 0);
+
+    const isValid = allFound.every(item =>
+      item.clusters.every((c: any) => c.feasible !== false)
+    );
+
+    return [
+      {
+        clusterization_id: 1,
+        fitness_score: totalScore,
+        is_valid: isValid,
+        clusters: mergedClusters,
+      },
+    ];
+  }
+
+  return algoData[taskKey] || [];
+};
+
 export default function ClusterizationModule() {
   const [selectedAlgo, setSelectedAlgo] = useState<string[]>([]);
   const [results, setResults] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [activeAlgo, setActiveAlgo] = useState<string | null>(null);
   const [logsByAlgo, setLogsByAlgo] = useState<Record<string, string[]>>({});
+  const [dataset, setDataset] = useState<"small" | "large" | "big">("small");
 
   const [polygonIdx, setPolygonIdx] = useState<Record<string, number>>({});
   const [variantIdx, setVariantIdx] = useState<Record<string, number>>({});
@@ -77,7 +141,7 @@ export default function ClusterizationModule() {
     setActiveAlgo(null);
 
     try {
-      await runClusteringWithProgress(selectedAlgo, (evt: ClusterProgressEvent) => {
+      await runClusteringWithProgress(selectedAlgo, dataset, (evt: ClusterProgressEvent) => {
         if (evt.type === "algo_start" && evt.algorithm) {
           const alg = evt.algorithm;
           setActiveAlgo(alg);
@@ -87,7 +151,6 @@ export default function ClusterizationModule() {
           const line = evt.line;
           setLogsByAlgo((prev) => {
             const existing = prev[alg] ?? [];
-            // keep the buffer bounded so a long run doesn't blow up memory/DOM
             return { ...prev, [alg]: [...existing, line].slice(-400) };
           });
         } else if (evt.type === "algo_done" && evt.algorithm && evt.data) {
@@ -95,10 +158,11 @@ export default function ClusterizationModule() {
           const data = evt.data;
           setResults((prev) => ({ ...prev, [alg]: data }));
           setPolygonIdx((prev) => ({ ...prev, [alg]: 0 }));
-          // Default to last variant (best result from evolutionary algorithm)
-          const firstTaskKey = Object.keys(data).sort((a, b) => Number(a) - Number(b))[0];
-          const firstTaskVariants: any[] = firstTaskKey ? data[firstTaskKey] : [];
-          const lastVarIdx = firstTaskVariants.length > 0 ? firstTaskVariants.length - 1 : 0;
+
+          const tasks = getTasksFromAlgoData(data);
+          const firstTaskKey = tasks[0];
+          const variants = getVariantsFromAlgoData(data, firstTaskKey);
+          const lastVarIdx = variants.length > 0 ? variants.length - 1 : 0;
           setVariantIdx((prev) => ({ ...prev, [alg]: lastVarIdx }));
         } else if (evt.type === "error") {
           console.error("Clustering error:", evt.message);
@@ -109,29 +173,17 @@ export default function ClusterizationModule() {
       alert(`Clasterization failed: ${error}`);
     } finally {
       setLoading(false);
-      setActiveAlgo(null);
     }
-  }, [selectedAlgo]);
-
-  const getTasks = (alg: string) => {
-    const algRes = results[alg];
-    if (!algRes) return [];
-    return Object.keys(algRes).sort((a, b) => Number(a) - Number(b));
-  };
-
-  const getVariants = (alg: string, taskKey: string) => {
-    const algRes = results[alg];
-    if (!algRes || !algRes[taskKey]) return [];
-    return algRes[taskKey];
-  };
+  }, [selectedAlgo, dataset]);
 
   const handlePolygonChange = (alg: string, newVal: number, max: number) => {
     const clamped = Math.min(Math.max(newVal, 1), max) - 1;
     setPolygonIdx((prev) => ({ ...prev, [alg]: clamped }));
-    // Default to last variant for the newly selected polygon
-    const tasks = getTasks(alg);
+
+    const algoData = results[alg];
+    const tasks = getTasksFromAlgoData(algoData);
     const taskKey = tasks[clamped] || tasks[0];
-    const variants = getVariants(alg, taskKey);
+    const variants = getVariantsFromAlgoData(algoData, taskKey);
     const lastVarIdx = variants.length > 0 ? variants.length - 1 : 0;
     setVariantIdx((prev) => ({ ...prev, [alg]: lastVarIdx }));
   };
@@ -171,16 +223,32 @@ export default function ClusterizationModule() {
 
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="w-full lg:w-56 flex-shrink-0">
+          <div className=" items-center gap-1 mb-8">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Dataset</label>
+            <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+              {(["small", "large"] as const).map((size) => (
+                <button
+                  key={size}
+                  onClick={() => {
+                    setDataset(size);
+                    setResults({});
+                  }}
+                  disabled={loading}
+                  className={`px-4 py-1.5 text-xs font-medium rounded-md capitalize transition-colors ${
+                    dataset === size 
+                      ? "bg-white shadow-sm text-blue-600" 
+                      : "text-gray-500 hover:text-gray-700 disabled:opacity-50"
+                  }`}
+                >
+                  {size}
+                </button>
+              ))}
+            </div>
+          </div>
           <div className="flex items-center gap-1 mb-2">
-            <label className="block text-sm font-medium text-gray-700">
-              Algorithms
-            </label>
-
+            <label className="block text-sm font-medium text-gray-700">Algorithms</label>
             <div className="relative flex items-center group">
-              <button
-                type="button"
-                className="text-gray-400 hover:text-gray-600 focus:outline-none"
-              >
+              <button type="button" className="text-gray-400 hover:text-gray-600 focus:outline-none">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
@@ -191,6 +259,7 @@ export default function ClusterizationModule() {
               </span>
             </div>
           </div>
+
           <div className="space-y-2">
             {AVAILABLE_EVO_ALGORITHMS.map((alg) => (
               <label key={alg} className="flex items-center space-x-2 cursor-pointer">
@@ -205,7 +274,7 @@ export default function ClusterizationModule() {
             ))}
           </div>
 
-          <div className="space-y-2 border-t-1 border-gray-200 pt-4">
+          <div className="space-y-2 border-t border-gray-200 mt-2 pt-2">
             {AVAILABLE_STANDALONE_ALGORITHMS.map((alg) => (
               <label key={alg} className="flex items-center space-x-2 cursor-pointer">
                 <input
@@ -223,22 +292,19 @@ export default function ClusterizationModule() {
         <div className="flex-1 space-y-6">
           {!hasStartedRun ? (
             <div className="border border-gray-200 rounded-lg p-4">
-              <div className="mb-3 text-sm text-gray-500 flex justify-between items-center">
-                <span>
-                  {selectedAlgo.length === 0
-                    ? "Select at least one algorithm and press Run."
-                    : "Press Run to execute selected algorithms."}
-                </span>
+              <div className="mb-3 text-sm text-gray-500">
+                {selectedAlgo.length === 0
+                  ? "Select at least one algorithm and press Run."
+                  : "Press Run to execute selected algorithms."}
               </div>
-              <ClusterMapCanvas clusters={[]} taskId="" />
+              <ClusterMapCanvas clusters={[]} taskId="" dataset={dataset} />
             </div>
           ) : (
             selectedAlgo.map((alg) => {
-              const tasks = getTasks(alg);
+              const algoData = results[alg];
+              const tasks = getTasksFromAlgoData(algoData);
 
               if (tasks.length === 0) {
-                // No results yet for this algorithm — it's either currently
-                // running or queued behind another one.
                 const isActive = activeAlgo === alg;
                 const lines = logsByAlgo[alg] ?? [];
                 return (
@@ -247,16 +313,11 @@ export default function ClusterizationModule() {
                       <div className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded">
                         {alg}
                       </div>
-                      <span
-                        className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                          isActive ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"
-                        }`}
-                      >
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${isActive ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500"}`}>
                         {isActive ? "Running" : "In queue"}
                       </span>
                     </div>
-
-                    <ClusterMapCanvas clusters={[]} taskId="" isRunning />
+                    <ClusterMapCanvas clusters={[]} taskId="" dataset={dataset} isRunning />
                     <RunLogPanel lines={lines} active={isActive} />
                   </div>
                 );
@@ -264,9 +325,14 @@ export default function ClusterizationModule() {
 
               const selectedTaskIdx = polygonIdx[alg] ?? 0;
               const selectedTaskKey = tasks[selectedTaskIdx] || tasks[0];
-              const variants = getVariants(alg, selectedTaskKey);
+              const variants = getVariantsFromAlgoData(algoData, selectedTaskKey);
               const selectedVarIdx = variantIdx[alg] ?? 0;
-              const selectedVariantClusters = variants[selectedVarIdx] || [];
+
+              const selectedVariant = variants[selectedVarIdx];
+              const selectedVariantClusters = selectedVariant
+                ? selectedVariant.clusters
+                : [];
+
               const lines = logsByAlgo[alg] ?? [];
 
               return (
@@ -301,6 +367,15 @@ export default function ClusterizationModule() {
                           className="w-16 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm px-2 py-1"
                         />
                         <span className="text-xs text-gray-400">/ {variants.length}</span>
+
+                        {selectedVariant?.fitness_score !== undefined && (
+                          <span className="text-xs ml-3 px-2 py-0.5 rounded font-medium bg-emerald-100 text-emerald-700">
+                            {alg === "GNN"
+                              ? `Total Cost: ${selectedVariant.fitness_score.toFixed(2)}`
+                              : `Score: ${selectedVariant.fitness_score.toFixed(2)}`
+                            }
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded">
@@ -308,7 +383,8 @@ export default function ClusterizationModule() {
                     </div>
                   </div>
 
-                  <ClusterMapCanvas clusters={selectedVariantClusters} taskId={selectedTaskKey} />
+                  <ClusterMapCanvas clusters={selectedVariantClusters} taskId={selectedTaskKey} dataset={dataset} />
+
                   {lines.length > 0 && (
                     <details className="mt-3">
                       <summary className="text-xs text-gray-400 cursor-pointer select-none">
