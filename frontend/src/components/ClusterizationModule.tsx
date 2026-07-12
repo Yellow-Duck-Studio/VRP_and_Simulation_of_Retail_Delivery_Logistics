@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { PlayIcon } from "@heroicons/react/24/solid";
-import { runClusteringWithProgress, type ClusterProgressEvent } from "../api.ts";
+import { runClusteringWithProgress, type ClusterProgressEvent, type AlgorithmResults, type AllResults, type GnnTaskResult, type GnnClusterData, type ClusterizationVariant } from "../api.ts";
 import ClusterMapCanvas from "./ClusterMapCanvas";
 
 const AVAILABLE_EVO_ALGORITHMS = ["DBScan", "Clarke Wright", "Sweep", "Destroy & Repair", "Random"];
@@ -58,10 +58,10 @@ const sortTaskKeys = (keys: string[]) => {
   });
 };
 
-const getTasksFromAlgoData = (algoData: any): string[] => {
+const getTasksFromAlgoData = (algoData: AlgorithmResults): string[] => {
   if (!algoData) return [];
   if (Array.isArray(algoData)) {
-    const keys = algoData.map((item: any) => {
+    const keys = algoData.map((item: GnnTaskResult) => {
       const id = item.task_id;
       return typeof id === "string" && id.startsWith("task_") ? id : `task_${id}`;
     });
@@ -70,35 +70,35 @@ const getTasksFromAlgoData = (algoData: any): string[] => {
   return sortTaskKeys(Object.keys(algoData));
 };
 
-const getVariantsFromAlgoData = (algoData: any, taskKey: string): any[] => {
+const getVariantsFromAlgoData = (algoData: AlgorithmResults, taskKey: string): ClusterizationVariant[] => {
   if (!algoData || !taskKey) return [];
 
   if (Array.isArray(algoData)) {
     const rawId = taskKey.replace("task_", "");
     const allFound = algoData.filter(
-      (item: any) => String(item.task_id) === taskKey || String(item.task_id) === rawId
+      (item: GnnTaskResult) => String(item.task_id) === taskKey || String(item.task_id) === rawId
     );
 
     if (allFound.length === 0) return [];
 
-    const mergedClusters = allFound.flatMap((item: any) =>
-      item.clusters.map((c: any) => {
+    const mergedClusters = allFound.flatMap((item: GnnTaskResult) =>
+      item.clusters.map((c: GnnClusterData) => {
         const sequence = c.order_sequence || c.order_ids || [];
 
         return {
-          order_ids: sequence.map((id: any) => Number(id)),
+          order_ids: sequence.map((id: string | number) => Number(id)),
           transport_type: c.transport || "unknown",
-          warehouse_id: item.warehouse_id
+          warehouse_id: Number(item.warehouse_id)
         };
       })
     );
 
     const totalScore = allFound.reduce((acc, item) =>
-      acc + item.clusters.reduce((cAcc: number, c: any) => cAcc + (c.cost || 0), 0)
+      acc + item.clusters.reduce((cAcc: number, c: GnnClusterData) => cAcc + (c.cost || 0), 0)
     , 0);
 
     const isValid = allFound.every(item =>
-      item.clusters.every((c: any) => c.feasible !== false)
+      item.clusters.every((c: GnnClusterData) => c.feasible !== false)
     );
 
     return [
@@ -111,12 +111,12 @@ const getVariantsFromAlgoData = (algoData: any, taskKey: string): any[] => {
     ];
   }
 
-  return algoData[taskKey] || [];
+  return (algoData as Record<string, ClusterizationVariant[]>)[taskKey] || [];
 };
 
 export default function ClusterizationModule() {
   const [selectedAlgo, setSelectedAlgo] = useState<string[]>([]);
-  const [results, setResults] = useState<Record<string, any>>({});
+  const [results, setResults] = useState<AllResults>({});
   const [loading, setLoading] = useState(false);
   const [activeAlgo, setActiveAlgo] = useState<string | null>(null);
   const [logsByAlgo, setLogsByAlgo] = useState<Record<string, string[]>>({});

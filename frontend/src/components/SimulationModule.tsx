@@ -14,7 +14,7 @@ interface Metrics {
 }
 
 function extractMetrics(text: string): Metrics {
-  const cleanText = text.replace(/(?:\x1b|\u001b|\\033)\[\d+m/g, "");
+  const cleanText = text.replace(/(?:\\x1b|\\u001b|\\033)\[\d+m/g, "");
 
   const num = (re: RegExp) => {
     const m = cleanText.match(re);
@@ -144,7 +144,7 @@ export default function SimulationModule() {
       let activeStyles = 0;
       let contentHtml = "";
 
-      const parts = content.split(/(?:\x1b|\u001b|\\033)\[(\d+)m/);
+      const parts = content.split(/(?:\\x1b|\\u001b|\\033)\[(\d+)m/);
 
       for (let i = 0; i < parts.length; i++) {
         if (i % 2 === 0) {
