@@ -223,9 +223,9 @@ export default function ClusterizationModule() {
 
       <div className="flex flex-col lg:flex-row gap-6">
         <div className="w-full lg:w-56 flex-shrink-0">
-          <div className=" items-center gap-1 mb-8">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Dataset</label>
-            <div className="flex items-center bg-gray-100 p-1 rounded-lg">
+          <div className="mb-8">
+            <label className="block text-sm font-medium text-gray-700 mb-3">Datasets</label>
+            <div className="inline-flex p-1 space-x-1 bg-gray-100/80 border border-gray-200 rounded-xl shadow-inner">
               {(["small", "large"] as const).map((size) => (
                 <button
                   key={size}
@@ -234,34 +234,27 @@ export default function ClusterizationModule() {
                     setResults({});
                   }}
                   disabled={loading}
-                  className={`px-4 py-1.5 text-xs font-medium rounded-md capitalize transition-colors ${
-                    dataset === size 
-                      ? "bg-white shadow-sm text-blue-600" 
-                      : "text-gray-500 hover:text-gray-700 disabled:opacity-50"
-                  }`}
+                  className={`
+                    relative w-24 py-1.5 text-center text-sm font-medium rounded-lg capitalize transition-all duration-200 ease-in-out
+                    ${
+                      dataset === size
+                        ? "bg-white text-blue-600 shadow-sm ring-1 ring-black/5"
+                        : "text-gray-500 hover:text-gray-800 hover:bg-gray-200/50"
+                    }
+                    ${loading ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
+                  `}
                 >
                   {size}
                 </button>
               ))}
             </div>
           </div>
+
           <div className="flex items-center gap-1 mb-2">
-            <label className="block text-sm font-medium text-gray-700">Algorithms</label>
-            <div className="relative flex items-center group">
-              <button type="button" className="text-gray-400 hover:text-gray-600 focus:outline-none">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </button>
-
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 w-max max-w-[300px] whitespace-normal shadow-lg">
-                Algorithms below are used to initiate initial population for evolutionary algorithm.
-              </span>
-            </div>
+            <label className="block text-sm font-medium text-gray-700">Standalone</label>
           </div>
-
-          <div className="space-y-2">
-            {AVAILABLE_EVO_ALGORITHMS.map((alg) => (
+          <div className="relative flex items-center group space-y-2">
+            {AVAILABLE_STANDALONE_ALGORITHMS.map((alg) => (
               <label key={alg} className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -274,8 +267,23 @@ export default function ClusterizationModule() {
             ))}
           </div>
 
-          <div className="space-y-2 border-t border-gray-200 mt-2 pt-2">
-            {AVAILABLE_STANDALONE_ALGORITHMS.map((alg) => (
+          <div className="flex items-center gap-1 mb-2 pt-5">
+            <label className="block text-sm font-medium text-gray-700">Evolutionary algorithm</label>
+            <div className="relative flex items-center group">
+              <button type="button" className="text-gray-400 hover:text-gray-600 focus:outline-none">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </button>
+
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 w-max max-w-[300px] whitespace-normal shadow-lg">
+                Algorithms below are used to initiate initial population for evolutionary algorithm. Does not support dataset choosing.
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {AVAILABLE_EVO_ALGORITHMS.map((alg) => (
               <label key={alg} className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"
