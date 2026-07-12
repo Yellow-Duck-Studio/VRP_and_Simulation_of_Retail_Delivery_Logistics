@@ -96,10 +96,10 @@ export default function ClusterMap({ clusters, taskId, isRunning = false }: Clus
     const loadAll = async () => {
       const promises: Promise<void>[] = [];
       if (Object.keys(orders).length === 0) {
-        promises.push(loadOrdersDataset(`${DATA_BASE_URL}/data/orders.csv`));
+        promises.push(loadOrdersDataset(`${DATA_BASE_URL}/data/small/orders.csv`));
       }
       if (Object.keys(warehouses).length === 0) {
-        promises.push(loadWarehousesDataset(`${DATA_BASE_URL}/data/warehouses.csv`));
+        promises.push(loadWarehousesDataset(`${DATA_BASE_URL}/data/small/warehouses.csv`));
       }
       if (promises.length > 0) {
         await Promise.all(promises);

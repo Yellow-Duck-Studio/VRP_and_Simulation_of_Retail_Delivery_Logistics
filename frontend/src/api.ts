@@ -63,7 +63,7 @@ export const API_BASE_URL = `${API_BASE}/api`;
 export const DATA_BASE_URL = API_BASE || "";
 export const WS_BASE_URL = API_BASE ? API_BASE.replace(/^http/, "ws") : "";
 
-export async function loadOrdersDataset(csvUrl: string = `${DATA_BASE_URL}/data/orders.csv`): Promise<void> {
+export async function loadOrdersDataset(csvUrl: string = `${DATA_BASE_URL}/data/small/orders.csv`): Promise<void> {
   try {
     const response = await fetch(csvUrl);
     const text = await response.text();
@@ -107,7 +107,7 @@ export function getWarehousesForTask(taskId: number | string): WarehouseInfo[] {
   return Object.values(warehouses).filter((w) => w.taskId === tId);
 }
 
-export async function loadWarehousesDataset(csvUrl: string = `${DATA_BASE_URL}/data/warehouses.csv`): Promise<void> {
+export async function loadWarehousesDataset(csvUrl: string = `${DATA_BASE_URL}/data/small/warehouses.csv`): Promise<void> {
   try {
     const response = await fetch(csvUrl);
     const text = await response.text();
