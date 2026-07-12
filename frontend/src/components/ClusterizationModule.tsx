@@ -3,7 +3,9 @@ import { PlayIcon } from "@heroicons/react/24/solid";
 import { runClusteringWithProgress, type ClusterProgressEvent } from "../api.ts";
 import ClusterMapCanvas from "./ClusterMapCanvas";
 
-const AVAILABLE_ALGORITHMS = ["DBScan", "Clarke Wright", "Sweep", "Destroy & Repair", "Random"];
+const AVAILABLE_EVO_ALGORITHMS = ["DBScan", "Clarke Wright", "Sweep", "Destroy & Repair", "Random"];
+
+const AVAILABLE_STANDALONE_ALGORITHMS = ["GNN"];
 
 function RunLogPanel({ lines, active }: { lines: string[]; active: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -190,7 +192,21 @@ export default function ClusterizationModule() {
             </div>
           </div>
           <div className="space-y-2">
-            {AVAILABLE_ALGORITHMS.map((alg) => (
+            {AVAILABLE_EVO_ALGORITHMS.map((alg) => (
+              <label key={alg} className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedAlgo.includes(alg)}
+                  onChange={() => toggleAlgorithm(alg)}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">{alg}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="space-y-2 border-t-1 border-gray-200 pt-4">
+            {AVAILABLE_STANDALONE_ALGORITHMS.map((alg) => (
               <label key={alg} className="flex items-center space-x-2 cursor-pointer">
                 <input
                   type="checkbox"

@@ -29,6 +29,8 @@ ALGO_MAPPING = {
     "Random": "RnD"
 }
 
+STANDALONE_ALGORITHMS = ["GNN"]
+
 
 class ClusterRequest(BaseModel):
     algorithms: List[str]
@@ -43,10 +45,13 @@ async def run_clustering(request: ClusterRequest):
     try:
         for alg in request.algorithms:
             py_alg_name = ALGO_MAPPING.get(alg)
-            if not py_alg_name:
+            if not py_alg_name and alg not in STANDALONE_ALGORITHMS:
                 raise HTTPException(status_code=400, detail=f"Unknown algorithm: {alg}")
 
-            subprocess.run(["python3", "main.py", py_alg_name], check=True)
+            if alg == STANDALONE_ALGORITHMS[0]:
+                subprocess.run(["python3", "GNN/predict.py", "--out", "data/master_clusterizations.json"], check=True)
+            else:
+                subprocess.run(["python3", "main.py", py_alg_name], check=True)
 
             output_path = os.path.join("data", "master_clusterizations.json")
             with open(output_path, "r", encoding="utf-8") as f:
