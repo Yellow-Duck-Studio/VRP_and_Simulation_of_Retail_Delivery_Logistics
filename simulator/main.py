@@ -138,7 +138,7 @@ def main():
 
     logger.info(f"{Colors.BLUE}------------------------------ Validation Summary ----------------------------{Colors.RESET}")
     validation_report = controller.get_validation_report()
-    for key, value in validation_report.summary.items():
+    for key, value in validation_report.summary.items():    
         if isinstance(value, dict):
             dict_items = ", ".join([f"{k.upper()}: {v}" for k, v in value.items()])
             logger.info(f"  {key}: {dict_items}")

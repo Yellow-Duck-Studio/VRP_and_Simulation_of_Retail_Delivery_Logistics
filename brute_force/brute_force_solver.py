@@ -251,8 +251,8 @@ def build_master_archive(results):
 def main():
     orders, warehouses, transports = load_data(
         "../data/small/orders.csv",
-        "data/warehouses.csv",
-        "data/transport_types.csv",
+        "../data/small/warehouses.csv",
+        "../data/transport_types.csv",
     )
 
     results = {}  # task_id -> warehouse_id -> solution
@@ -292,7 +292,7 @@ def main():
         json.dump(results, f, indent=2, ensure_ascii=False)
 
     summary_df = pd.DataFrame(summary_rows)
-    summary_df.to_csv("data/optimal_summary.csv", index=False)
+    summary_df.to_csv("../data/optimal_summary.csv", index=False)
 
     build_master_archive(results)
 
