@@ -218,8 +218,8 @@ if __name__ == "__main__":
         )
         sys.exit(1)
 
-    orders_df = pd.read_csv('data/large/orders-L.csv')
-    warehouses_df = pd.read_csv('data/large/warehouses-L.csv')
+    orders_df = pd.read_csv('data/large/orders.csv')
+    warehouses_df = pd.read_csv('data/large/warehouses.csv')
 
     try:
         visualize_task_solution(
