@@ -311,8 +311,8 @@ def main(orders_path, warehouses_path, transport_path, out_prefix, max_k=5, verb
 if __name__ == "__main__":
     import sys
     main(
-        "../data/large/orders-L.csv",
-        "../data/large/warehouses-L.csv",
+        "../data/large/orders.csv",
+        "../data/large/warehouses.csv",
         "../data/transport_types.csv",
         "ilp",
     )

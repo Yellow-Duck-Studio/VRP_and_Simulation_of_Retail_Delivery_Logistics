@@ -34,14 +34,15 @@ def test_cluster_post_success(client):
         mock_file.__enter__.return_value.read.return_value = json.dumps(dummy_results)
         mock_open.return_value = mock_file
 
-        response = client.post("/api/cluster", json={"algorithms": ["DBScan"]})
+        response = client.post("/api/cluster", json={"algorithms": ["DBScan"], "dataset": "small"})
         assert response.status_code == 200
         assert response.json() == {"DBScan": {"clusters": [[1, 2], [3, 4]]}}
 
-        mock_run.assert_called_once_with(
-            ["python3", "main.py", "DBSCAN"],
-            check=True
-        )
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        assert call_args[0][0] == ["python3", "main.py", "DBSCAN"]
+        assert call_args[1]["check"] is True
+        assert "env" in call_args[1]
 
 
 def test_cluster_post_invalid_algorithm(client):

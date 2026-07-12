@@ -83,7 +83,7 @@ describe('ClusterMapCanvas – idle / running states', () => {
 // ═══════════════════════════════════════════════
 describe('ClusterMapCanvas – with clusters', () => {
   it('renders order points and warehouses', async () => {
-    render(<ClusterMapCanvas clusters={[[1]]} taskId={0} />);
+    render(<ClusterMapCanvas clusters={[{ order_ids: [1], order_sequence: null }]} taskId={0} />);
     await waitForDataLoaded();
 
     await waitFor(() => {
@@ -94,7 +94,7 @@ describe('ClusterMapCanvas – with clusters', () => {
   });
 
   it('shows tooltip on order hover', async () => {
-    render(<ClusterMapCanvas clusters={[[1]]} taskId={0} />);
+    render(<ClusterMapCanvas clusters={[{ order_ids: [1], order_sequence: null }]} taskId={0} />);
     await waitForDataLoaded();
 
     await waitFor(() => screen.getByText('1'));
@@ -112,7 +112,7 @@ describe('ClusterMapCanvas – with clusters', () => {
   });
 
   it('shows warehouse tooltip on hover', async () => {
-    render(<ClusterMapCanvas clusters={[[1]]} taskId={0} />);
+    render(<ClusterMapCanvas clusters={[{ order_ids: [1], order_sequence: null }]} taskId={0} />);
     await waitForDataLoaded();
 
     await waitFor(() => screen.getByText('W10'));
