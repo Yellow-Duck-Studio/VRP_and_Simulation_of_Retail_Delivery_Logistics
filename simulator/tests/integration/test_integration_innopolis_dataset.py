@@ -98,7 +98,7 @@ def test_validate_all_runs_cleanly_over_the_full_dataset(dataset):
 
     report = validator.validate_all()
 
-    assert report.summary["total_routes"] == len(dataset["routes"]) == 4
+    assert report.summary["Total Routes"] == len(dataset["routes"]) == 4
     # Every route/courier/courier_type reference in this fixture is
     # well-formed, so there should be no referential-integrity errors.
     assert not any(
@@ -117,5 +117,5 @@ def test_strict_validation_config_treats_gaps_as_errors(dataset):
         config=ValidationConfig(require_distance_matrix_entry=True),
     )
     report = validator.validate_all()
-    assert report.summary["issues_by_severity"]["error"] >= 0  # never crashes / always a well-formed summary
+    assert report.summary["Issues By Severity"]["error"] >= 0  # never crashes / always a well-formed summary
     assert isinstance(report.is_valid, bool)
