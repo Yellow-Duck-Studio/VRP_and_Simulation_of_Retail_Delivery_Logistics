@@ -49,5 +49,11 @@ class OrderFSM:
             ))
 
     def cancel(self, current_time: datetime) -> None:
-        self.order.status = OrderStatus.CANCELLED
-        # publish event if needed
+        if self.order.status not in (OrderStatus.DELIVERED, OrderStatus.CANCELLED):
+            self.order.status = OrderStatus.CANCELLED
+            self.event_manager.publish(Event(
+                EventType.ORDER_CANCELLED,
+                current_time,
+                {"order_id": self.order.order_id},
+                self.order.order_id
+            ))

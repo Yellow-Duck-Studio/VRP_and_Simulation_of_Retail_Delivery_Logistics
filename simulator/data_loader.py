@@ -16,7 +16,6 @@ def parse_datetime(dt_str: str) -> datetime:
 
 def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     """Load data from JSON in StateManager."""
-    logger.info(f"Loading data from {json_path}")
     with open(json_path, 'r', encoding='utf-8') as f:
         data: Dict[str, Any] = json.load(f)
 
