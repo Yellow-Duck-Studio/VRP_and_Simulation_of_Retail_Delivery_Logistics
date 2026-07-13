@@ -92,8 +92,8 @@ def main():
 
     print("Loading comprehensive datasets...")
 
-    tasks_orders     = load_all_orders('data/orders.csv')
-    tasks_warehouses = load_all_warehouses('data/warehouses.csv')
+    tasks_orders     = load_all_orders('data/small/orders.csv')
+    tasks_warehouses = load_all_warehouses('data/small/warehouses.csv')
     speeds, max_payloads, fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee \
         = load_transport_constraints('data/transport_types.csv')
 

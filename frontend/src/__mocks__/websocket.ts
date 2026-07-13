@@ -15,10 +15,10 @@ import { vi } from 'vitest';
  */
 export class MockWebSocket {
   // Event handlers exactly like the browser WebSocket
-  onopen: ((this: WebSocket, ev: Event) => any) | null = null;
-  onmessage: ((this: WebSocket, ev: MessageEvent) => any) | null = null;
-  onerror: ((this: WebSocket, ev: Event) => any) | null = null;
-  onclose: ((this: WebSocket, ev: CloseEvent) => any) | null = null;
+  onopen: ((this: WebSocket, ev: Event) => unknown) | null = null;
+  onmessage: ((this: WebSocket, ev: MessageEvent) => unknown) | null = null;
+  onerror: ((this: WebSocket, ev: Event) => unknown) | null = null;
+  onclose: ((this: WebSocket, ev: CloseEvent) => unknown) | null = null;
 
   // Mocked methods
   send = vi.fn();
@@ -34,21 +34,21 @@ export class MockWebSocket {
 
   // ── Simulation helpers ──────────────────────
   simulateOpen() {
-    this.onopen?.call(null as any, new Event('open'));
+    this.onopen?.call(this as unknown as WebSocket, new Event('open'));
   }
 
-  simulateMessage(data: any) {
+  simulateMessage(data: unknown) {
     this.onmessage?.call(
-      null as any,
+      this as unknown as WebSocket,
       new MessageEvent('message', { data: JSON.stringify(data) })
     );
   }
 
   simulateError() {
-    this.onerror?.call(null as any, new Event('error'));
+    this.onerror?.call(this as unknown as WebSocket, new Event('error'));
   }
 
   simulateClose(eventInit?: CloseEventInit) {
-    this.onclose?.call(null as any, new CloseEvent('close', eventInit));
+    this.onclose?.call(this as unknown as WebSocket, new CloseEvent('close', eventInit));
   }
 }
