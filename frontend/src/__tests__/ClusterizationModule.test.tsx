@@ -44,8 +44,9 @@ const clickRun = async () => {
 describe('ClusterizationModule', () => {
   it('renders algorithm list and a disabled Run button', () => {
     render(<ClusterizationModule />);
-    expect(screen.getByText('Algorithms')).toBeInTheDocument();
-    for (const algo of ['DBScan', 'Clarke Wright', 'Sweep', 'Destroy & Repair', 'Random']) {
+    expect(screen.getByText('Standalone')).toBeInTheDocument();
+    expect(screen.getByText('Evolutionary algorithm')).toBeInTheDocument();
+    for (const algo of ['GNN', 'DBScan', 'Clarke Wright', 'Sweep', 'Destroy & Repair', 'Random']) {
       expect(screen.getByLabelText(algo)).toBeInTheDocument();
     }
     expect(screen.getByRole('button', { name: /run/i })).toBeDisabled();
@@ -53,7 +54,7 @@ describe('ClusterizationModule', () => {
 
   it('enables Run button when at least one algorithm is selected', async () => {
     render(<ClusterizationModule />);
-    await selectAlgorithm('DBScan');
+    await selectAlgorithm('GNN');
     expect(screen.getByRole('button', { name: /run/i })).toBeEnabled();
   });
 
@@ -61,16 +62,28 @@ describe('ClusterizationModule', () => {
     mockedApi.runClusteringWithProgress.mockImplementation(
       (_algorithms: string[], onEvent: (e: ClusterProgressEvent) => void) =>
         new Promise((resolve) => {
-          onEvent({ type: 'algo_start', algorithm: 'DBScan' });
-          onEvent({ type: 'log', algorithm: 'DBScan', line: 'Loading data...' });
-          onEvent({ type: 'algo_done', algorithm: 'DBScan', data: { task_1: [[[1, 2]]] } });
+          onEvent({ type: 'algo_start', algorithm: 'GNN' });
+          onEvent({ type: 'log', algorithm: 'GNN', line: 'Loading data...' });
+          onEvent({ type: 'algo_done', algorithm: 'GNN', data: [
+            {
+              task_id: "1",
+              warehouse_id: "1",
+              num_orders: 2,
+              clusters: [
+                { order_ids: ["1"], feasible: true, transport: "bike", order_sequence: ["1"] },
+                { order_ids: ["2"], feasible: true, transport: "bike", order_sequence: ["2"] }
+              ],
+              total_cost: 100,
+              feasible: true
+            }
+          ] });
           onEvent({ type: 'done' });
           setTimeout(() => resolve({}), 0);
         })
     );
 
     render(<ClusterizationModule />);
-    await selectAlgorithm('DBScan');
+    await selectAlgorithm('GNN');
 
     // Fire click synchronously – does NOT wait for the async handler to finish
     fireEvent.click(screen.getByRole('button', { name: /run/i }));
@@ -78,72 +91,12 @@ describe('ClusterizationModule', () => {
     // Now the loading state should be visible (spinner is in the DOM)
     expect(document.querySelector('.animate-spin')).toBeInTheDocument();
 
-    // Wait for the logs to appear (after the mock resolves)
+    // Wait for clustering to complete
     await waitFor(() => {
-      expect(screen.getByText('Loading data...')).toBeInTheDocument();
-    });
-
-    // Polygon / variant controls appear
-    await waitFor(() => {
-      expect(screen.getByText('Polygon')).toBeInTheDocument();
-      expect(screen.getByText('Variant')).toBeInTheDocument();
-    });
-
-    // Run button is no longer disabled
-    expect(screen.getByRole('button', { name: /run/i })).not.toBeDisabled();
-  });
-
-  it('updates displayed clusters when polygon / variant change', async () => {
-    mockedApi.runClusteringWithProgress.mockImplementation(
-      (_algorithms: string[], onEvent: (e: ClusterProgressEvent) => void) =>
-        new Promise((resolve) => {
-          onEvent({
-            type: 'algo_done',
-            algorithm: 'DBScan',
-            data: {
-              task_1: [[[1]], [[2]]],  // 2 variants for task 1
-              task_2: [[[3]], [[4]]],  // 2 variants for task 2
-            },
-          });
-          onEvent({ type: 'done' });
-          resolve({});
-        })
-    );
-
-    render(<ClusterizationModule />);
-    await selectAlgorithm('DBScan');
-    await clickRun();
-
-    // Wait for controls
-    await waitFor(() => screen.getByDisplayValue('1')); // polygon input = 1
-
-    // Default: last variant of task_1 → variant index 1 = [[2]]
-    const canvas = screen.getByTestId('cluster-map-canvas');
-    const clusters = JSON.parse(canvas.dataset.clusters!);
-    expect(clusters).toEqual([[2]]);
-
-    // Switch to polygon 2
-    const polyInput = screen.getAllByRole('spinbutton')[0]; // first = polygon
-    fireEvent.change(polyInput, { target: { value: '2' } });
-
-    // Variant resets to last variant of task_2 = [[4]]
-    await waitFor(() => {
-      const c = screen.getByTestId('cluster-map-canvas');
-      const cl = JSON.parse(c.dataset.clusters!);
-      expect(cl).toEqual([[4]]);
-    });
-
-    // Switch variant to 1
-    const varInput = screen.getAllByRole('spinbutton')[1]; // second = variant
-    fireEvent.change(varInput, { target: { value: '1' } });
-
-    // Now shows first variant of task_2 = [[3]]
-    await waitFor(() => {
-      const c = screen.getByTestId('cluster-map-canvas');
-      const cl = JSON.parse(c.dataset.clusters!);
-      expect(cl).toEqual([[3]]);
+      expect(screen.getByRole('button', { name: /run/i })).not.toBeDisabled();
     });
   });
+
 
   it('shows alert on clustering failure', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});

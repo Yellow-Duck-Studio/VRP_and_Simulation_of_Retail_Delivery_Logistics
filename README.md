@@ -120,8 +120,8 @@ python main.py RND
 ```
 
 This will:
-- Load orders from `data/orders.csv`
-- Load warehouses from `data/warehouses.csv`
+- Load orders from `data/small/orders.csv`
+- Load warehouses from `data/small/warehouses.csv`
 - Load transport constraints from `data/transport_types.csv`
 - Generate optimized clusters for each task
 - Save results to `data/master_clusterizations.json`

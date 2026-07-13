@@ -50,9 +50,9 @@ def build_submission_file(
 
 if __name__ == "__main__":
     build_submission_file(
-        warehouses_path="data/warehouses.csv",
+        warehouses_path="data/small/warehouses.csv",
         transport_types_path="data/transport_types.csv",
-        orders_path="data/orders.csv",
+        orders_path="data/small/orders.csv",
         clusterizations_csv_path="data/master_clusterizations.csv",
         output_path="data/final_submission.csv",
     )
