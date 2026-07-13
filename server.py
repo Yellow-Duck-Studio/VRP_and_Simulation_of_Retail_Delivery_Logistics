@@ -1,4 +1,5 @@
 import asyncio
+import glob
 import subprocess
 import json
 import os
@@ -9,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -28,24 +29,48 @@ ALGO_MAPPING = {
     "Random": "RnD"
 }
 
+STANDALONE_ALGORITHMS = ["GNN"]
+
+DATASET_PATHS = {
+    "small": {"orders": "./data/small/orders.csv", "warehouses": "./data/small/warehouses.csv"},
+    "large": {"orders": "./data/large/orders.csv", "warehouses": "./data/large/warehouses.csv"},
+    "big": {"orders": "./data/big/orders.csv", "warehouses": "./data/big/warehouses.csv"}
+}
+
 
 class ClusterRequest(BaseModel):
     algorithms: List[str]
+    dataset: Optional[str] = "small"
 
 
 @app.post("/api/cluster")
 async def run_clustering(request: ClusterRequest):
-    """Kept for backwards compatibility. Blocks until all algorithms finish
-    and returns only the final results — no live progress is reported.
-    Prefer the /ws/cluster WebSocket endpoint, which streams progress."""
     results = {}
+    paths = DATASET_PATHS.get(request.dataset, DATASET_PATHS["small"])
+
+    env = {
+        **os.environ,
+        "DATASET_ORDERS": paths["orders"],
+        "DATASET_WAREHOUSES": paths["warehouses"]
+    }
+
     try:
         for alg in request.algorithms:
             py_alg_name = ALGO_MAPPING.get(alg)
-            if not py_alg_name:
+            if not py_alg_name and alg not in STANDALONE_ALGORITHMS:
                 raise HTTPException(status_code=400, detail=f"Unknown algorithm: {alg}")
 
-            subprocess.run(["python3", "main.py", py_alg_name], check=True)
+            if alg == STANDALONE_ALGORITHMS[0]:
+                subprocess.run([
+                    "python3", "GNN/predict.py",
+                    "--warehouses", paths["warehouses"],
+                    "--orders", paths["orders"],
+                    "--transport", "./data/transport_types.csv",
+                    "--model", "./GNN/model.pt",
+                    "--out", "data/master_clusterizations.json"
+                ], check=True, env=env)
+            else:
+                subprocess.run(["python3", "main.py", py_alg_name], check=True, env=env)
 
             output_path = os.path.join("data", "master_clusterizations.json")
             with open(output_path, "r", encoding="utf-8") as f:
@@ -61,23 +86,12 @@ async def run_clustering(request: ClusterRequest):
 
 @app.websocket("/ws/cluster")
 async def run_clustering_ws(websocket: WebSocket):
-    """Runs the requested algorithms one by one, streaming each subprocess's
-    stdout to the client live so the UI can show real-time progress.
-
-    Client sends: {"algorithms": ["DBScan", "Sweep", ...]}
-
-    Server sends a sequence of JSON messages:
-      {"type": "algo_start", "algorithm": "DBScan"}
-      {"type": "log", "algorithm": "DBScan", "line": "Gen 100 | Best Fitness: ..."}
-      {"type": "algo_done", "algorithm": "DBScan", "data": {...}}   # parsed master_clusterizations.json for this algorithm
-      {"type": "error", "algorithm": "DBScan"?, "message": "..."}
-      {"type": "done", "results": {...}}   # all algorithms' data combined, same shape as the old POST endpoint
-    """
     await websocket.accept()
 
     try:
         payload = await websocket.receive_json()
         algorithms = payload.get("algorithms", [])
+        dataset = payload.get("dataset")
 
         if not algorithms:
             await websocket.send_json({"type": "error", "message": "No algorithms selected"})
@@ -85,11 +99,18 @@ async def run_clustering_ws(websocket: WebSocket):
             return
 
         results = {}
-        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+        paths = DATASET_PATHS.get(dataset, DATASET_PATHS["small"])
+
+        env = {
+            **os.environ,
+            "PYTHONUNBUFFERED": "1",
+            "DATASET_ORDERS": paths["orders"],
+            "DATASET_WAREHOUSES": paths["warehouses"]
+        }
 
         for alg in algorithms:
             py_alg_name = ALGO_MAPPING.get(alg)
-            if not py_alg_name:
+            if not py_alg_name and alg not in STANDALONE_ALGORITHMS:
                 await websocket.send_json({
                     "type": "error",
                     "algorithm": alg,
@@ -100,14 +121,25 @@ async def run_clustering_ws(websocket: WebSocket):
 
             await websocket.send_json({"type": "algo_start", "algorithm": alg})
 
-            # "-u" + PYTHONUNBUFFERED ensure main.py's print() output reaches us
-            # line-by-line instead of being buffered until the process exits.
-            process = await asyncio.create_subprocess_exec(
-                "python3", "-u", "main.py", py_alg_name,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-                env=env,
-            )
+            if alg == STANDALONE_ALGORITHMS[0]:
+                process = await asyncio.create_subprocess_exec(
+                    "python3", "-u", "GNN/predict.py",
+                    "--warehouses", paths["warehouses"],
+                    "--orders", paths["orders"],
+                    "--transport", "./data/transport_types.csv",
+                    "--model", "./GNN/model.pt",
+                    "--out", "./data/master_clusterizations.json",
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    env=env,
+                )
+            else:
+                process = await asyncio.create_subprocess_exec(
+                    "python3", "-u", "main.py", py_alg_name,
+                    stdout=asyncio.subprocess.PIPE,
+                    stderr=asyncio.subprocess.STDOUT,
+                    env=env,
+                )
 
             assert process.stdout is not None
             while True:
@@ -124,7 +156,7 @@ async def run_clustering_ws(websocket: WebSocket):
                 await websocket.send_json({
                     "type": "error",
                     "algorithm": alg,
-                    "message": f"'{py_alg_name}' exited with code {returncode}",
+                    "message": f"'{py_alg_name or alg}' exited with code {returncode}",
                 })
                 await websocket.close()
                 return
@@ -153,11 +185,36 @@ async def run_clustering_ws(websocket: WebSocket):
             pass
 
 
+class SimulationConfig(BaseModel):
+    input: Optional[str] = "test_data_innopolis.json"
+    time_step: Optional[int] = 5
+    max_steps: Optional[int] = 100
+    strict: Optional[bool] = False
+
+
+@app.get("/api/simulate/inputs")
+async def list_simulation_inputs():
+    pattern = os.path.join("simulator", "test_data*.json")
+    files = sorted(os.path.basename(p) for p in glob.glob(pattern))
+    if not files:
+        files = ["test_data_innopolis.json"]
+    return {"inputs": files}
+
+
 @app.post("/api/simulate")
-async def run_simulation():
+async def run_simulation(config: SimulationConfig = SimulationConfig()):
+    args = [
+        "python3", "-m", "simulator.main",
+        "--input", config.input or "test_data_innopolis.json",
+        "--time-step", str(config.time_step or 5),
+        "--max-steps", str(config.max_steps or 100),
+    ]
+    if config.strict:
+        args.append("--strict")
+
     try:
         result = subprocess.run(
-            ["python3", "-m", "simulator.main"],
+            args,
             capture_output=True,
             text=True,
             check=True,
@@ -165,7 +222,8 @@ async def run_simulation():
         )
         return PlainTextResponse(result.stdout)
     except subprocess.CalledProcessError as e:
-        raise HTTPException(status_code=500, detail=e.stderr or e.stdout)
+        detail = (e.stderr or "").strip() or (e.stdout or "").strip() or f"Simulation exited with code {e.returncode}"
+        raise HTTPException(status_code=500, detail=detail)
 
 
 app.mount("/data", StaticFiles(directory="data"), name="data")

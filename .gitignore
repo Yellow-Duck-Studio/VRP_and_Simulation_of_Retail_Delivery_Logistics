@@ -35,6 +35,7 @@ Thumbs.db
 # Local experiment outputs
 data/runs/
 data/runs_reports/
+data/*/runs/
 datasets/*/runs/
 datasets/enriched_runtime/
 

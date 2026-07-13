@@ -17,7 +17,10 @@ from experiments.types import AlgorithmSummary, ExperimentConfig, ExperimentRunM
 
 
 def _build_constraints(data_dir: Path) -> Constraint:
-    speeds, max_payloads, *_ = load_transport_constraints(str(data_dir / "transport_types.csv"))
+    transport_path = data_dir / "transport_types.csv"
+    if not transport_path.exists():
+        transport_path = data_dir.parent / "transport_types.csv"
+    speeds, max_payloads, *_ = load_transport_constraints(str(transport_path))
     return Constraint(
         max_order_count=5,
         max_weight_per_transport=max_payloads,

@@ -164,9 +164,6 @@
       "start_location": { "latitude": 55.7544, "longitude": 48.7420 },
       "end_location": { "latitude": 55.7560, "longitude": 48.7450 },
       "start_time": "2024-06-17T09:30:00",
-      "end_time": "2024-06-17T11:00:00",
-      "total_distance_km": 1.2,
-      "total_duration_minutes": 60,
       "stops": [
         {
           "order_id": "ORD001",
@@ -191,9 +188,6 @@
       "start_location": { "latitude": 55.7544, "longitude": 48.7420 },
       "end_location": { "latitude": 55.7525, "longitude": 48.7435 },
       "start_time": "2024-06-17T11:30:00",
-      "end_time": "2024-06-17T14:30:00",
-      "total_distance_km": 1.6,
-      "total_duration_minutes": 45,
       "stops": [
         {
           "order_id": "ORD002",
@@ -232,9 +226,6 @@
       "start_location": { "latitude": 55.7520, "longitude": 48.7480 },
       "end_location": { "latitude": 55.7510, "longitude": 48.7500 },
       "start_time": "2024-06-17T11:30:00",
-      "end_time": "2024-06-17T12:15:00",
-      "total_distance_km": 0.6,
-      "total_duration_minutes": 20,
       "stops": [
         {
           "order_id": "ORD003",
@@ -259,9 +250,6 @@
       "start_location": { "latitude": 55.7520, "longitude": 48.7480 },
       "end_location": { "latitude": 55.7555, "longitude": 48.7465 },
       "start_time": "2024-06-17T14:30:00",
-      "end_time": "2024-06-17T13:20:00",
-      "total_distance_km": 0.7,
-      "total_duration_minutes": 25,
       "stops": [
         {
           "order_id": "ORD004",

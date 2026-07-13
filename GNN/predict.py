@@ -118,11 +118,11 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--warehouses", required=True)
-    parser.add_argument("--orders", required=True)
-    parser.add_argument("--transport", required=True)
+    parser.add_argument("--warehouses", default="data/large/warehouses.csv")
+    parser.add_argument("--orders", default="data/large/orders.csv")
+    parser.add_argument("--transport", default="data/transport_types.csv")
     parser.add_argument("--couriers", default=None)
-    parser.add_argument("--model", default="model.pt")
+    parser.add_argument("--model", default="GNN/model.pt")
     parser.add_argument("--out", default="predictions.json")
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()

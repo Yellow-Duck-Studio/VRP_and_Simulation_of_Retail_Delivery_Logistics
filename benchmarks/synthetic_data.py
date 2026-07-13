@@ -126,7 +126,7 @@ def dataset_to_csv_rows(dataset: SyntheticDataset) -> List[dict]:
     feed it through the normal `load_all_orders` path instead of
     passing Order objects directly in-process.
 
-    Columns match data/orders.csv:
+    Columns match ../data/small/orders.csv:
     task_id,order_id,warehouse_id,order_lat,order_lon,pickup_ready_at,
     created_at,delivery_deadline_at,total_mass_kg
     """

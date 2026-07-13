@@ -12,7 +12,9 @@ def temp_json_file(sample_json_data):
     with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json') as f:
         json.dump(sample_json_data, f)
         temp_path = f.name
-    return temp_path
+    yield temp_path
+    import os
+    os.unlink(temp_path)
 
 
 def test_reader_loads_data(temp_json_file):

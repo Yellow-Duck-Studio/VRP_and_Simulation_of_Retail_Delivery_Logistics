@@ -5,6 +5,7 @@ from .engine import (
     StateManager,
     Event,
     EventType,
+    LocationResolver,
 )
 from .schemas import *
 from .data_loader import load_simulation_data
@@ -16,6 +17,7 @@ __all__ = [
     "StateManager",
     "Event",
     "EventType",
+    "LocationResolver",
     "Order",
     "OrderStatus",
     "Location",

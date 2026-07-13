@@ -29,9 +29,10 @@ Simulator for retail delivery logistics and Vehicle Routing Problem (VRP) optimi
   - Status: `idle`, `loading`, `delivering`, `returning`
   
 - **Route**: Planned delivery routes
-  - `route_id`, `courier_id`, `start_location`, `end_location`, `total_duration_minutes`, `total_distance_km`, `status` (planned 
-    / in progress / completed)  
+  - `route_id`, `courier_id`, `warehouse_id`, `start_location`, `end_location`, `start_time`, `status` (planned 
+    / in progress / completed), `stops` (list of RouteStop)
   - Optimised by the VRP solver; may be re‑planned dynamically.
+  - `end_time`, `total_distance_km`, `total_duration_minutes` are computed by the simulator during execution.
   
 - **Courier Type**: Type of courier
   - `type_id`, `name`, `capacity_kg`, `speed_kmh`
