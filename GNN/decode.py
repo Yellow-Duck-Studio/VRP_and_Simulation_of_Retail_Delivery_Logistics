@@ -1,12 +1,13 @@
 """Affinity-логиты по рёбрам -> валидное разбиение заказов на кластеры."""
 
 import math
-from typing import Dict, List
+from typing import Dict, List, Optional
 
+import pandas as pd
 import torch
 
 from config import MAX_CLUSTER_SIZE
-from costs import best_cluster_solution
+from costs import best_cluster_solution, required_couriers
 from io_utils import TransportTariff
 
 
@@ -106,6 +107,83 @@ def repair_clusters(
     return fixed
 
 
+def enforce_courier_capacity(
+    warehouse_lat: float,
+    warehouse_lon: float,
+    orders_by_id: Dict[str, dict],
+    clusters: List[List[str]],
+    tariffs: List[TransportTariff],
+    max_couriers: int,
+) -> List[List[str]]:
+    """
+    Жадно сливает кластеры, пока набор рейсов не станет исполнимым штатом
+    в max_couriers курьеров (required_couriers(...) <= max_couriers).
+    На каждой итерации выбирает пару кластеров с максимальным пересечением
+    по времени (это то, что реально создаёт потребность в доп. курьере) и
+    минимальным приростом стоимости при слиянии, и объединяет их в один
+    рейс — если объединение допустимо по MAX_CLUSTER_SIZE/грузоподъёмности/
+    дедлайнам (проверяется через best_cluster_solution, как и везде в этом
+    модуле).
+
+    Если дальше сливать нечего (все допустимые слияния исчерпаны), но лимит
+    всё ещё не соблюдён — возвращает то, что получилось, БЕЗ исключения.
+    Это осознанное решение: в проде лучше вернуть "неидеальный, но
+    рабочий" план и залогировать превышение штата, чем упасть или молча
+    нарушить дедлайны. Вызывающий код (infer.py) должен проверить
+    required_couriers() на результате и явно предупредить оператора, если
+    лимит всё ещё превышен.
+    """
+    clusters = [list(c) for c in clusters]
+    sols = [
+        best_cluster_solution(warehouse_lat, warehouse_lon,
+                               [orders_by_id[o] for o in c], tariffs)
+        for c in clusters
+    ]
+    # Все кластеры сюда должны приходить уже допустимыми (после repair_clusters),
+    # так что sols не должен содержать None. Если содержит — это баг выше по
+    # пайплайну, а не то, что эта функция должна молча проглатывать.
+    assert all(s is not None for s in sols), "enforce_courier_capacity получила недопустимый кластер"
+
+    while required_couriers(sols) > max_couriers:
+        best_pair = None
+        best_penalty = float("inf")
+        best_merged_sol = None
+
+        for i in range(len(clusters)):
+            for j in range(i + 1, len(clusters)):
+                if len(clusters[i]) + len(clusters[j]) > MAX_CLUSTER_SIZE:
+                    continue
+                overlap = min(sols[i]["finish_at"], sols[j]["finish_at"]) - \
+                          max(sols[i]["start_at"], sols[j]["start_at"])
+                if overlap <= pd.Timedelta(0):
+                    continue  # не пересекаются по времени -> слияние тут не поможет со штатом
+
+                trial_ids = clusters[i] + clusters[j]
+                trial_sol = best_cluster_solution(
+                    warehouse_lat, warehouse_lon,
+                    [orders_by_id[o] for o in trial_ids], tariffs,
+                )
+                if trial_sol is None:
+                    continue  # объединённый кластер недопустим (масса/дедлайны/размер)
+
+                penalty = trial_sol["cost"] - sols[i]["cost"] - sols[j]["cost"]
+                if penalty < best_penalty:
+                    best_penalty = penalty
+                    best_pair = (i, j)
+                    best_merged_sol = trial_sol
+
+        if best_pair is None:
+            break  # больше нечего сливать — возвращаем как есть, см. docstring
+
+        i, j = best_pair
+        clusters[i] = clusters[i] + clusters[j]
+        sols[i] = best_merged_sol
+        del clusters[j]
+        del sols[j]
+
+    return clusters
+
+
 def decode(
     model,
     data,
@@ -113,6 +191,7 @@ def decode(
     warehouse_lat: float,
     warehouse_lon: float,
     tariffs: List[TransportTariff],
+    max_couriers: Optional[int] = None,
 ) -> List[List[str]]:
     model.eval()
     with torch.no_grad():
@@ -133,4 +212,9 @@ def decode(
             affinity[key] = scores[k]
 
     raw_clusters = greedy_correlation_clustering(order_ids, affinity)
-    return repair_clusters(warehouse_lat, warehouse_lon, orders_by_id, raw_clusters, tariffs)
+    fixed = repair_clusters(warehouse_lat, warehouse_lon, orders_by_id, raw_clusters, tariffs)
+    if max_couriers is not None:
+        fixed = enforce_courier_capacity(
+            warehouse_lat, warehouse_lon, orders_by_id, fixed, tariffs, max_couriers
+        )
+    return fixed

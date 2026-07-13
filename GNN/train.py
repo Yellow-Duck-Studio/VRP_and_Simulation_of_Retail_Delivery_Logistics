@@ -5,7 +5,10 @@ import torch
 import torch.nn as nn
 from torch_geometric.loader import DataLoader
 
-from config import LR, WEIGHT_DECAY, EPOCHS, BATCH_SIZE, POS_WEIGHT, GRAD_CLIP, DEVICE, SEED
+from config import (
+    LR, WEIGHT_DECAY, EPOCHS, BATCH_SIZE, POS_WEIGHT, GRAD_CLIP, DEVICE, SEED,
+    DEFAULT_MAX_COURIERS,
+)
 from io_utils import load_instances, load_transport_types
 from data import WarehouseGraphDataset
 from model import ClusteringGNN
@@ -46,8 +49,8 @@ def train(warehouses_csv, orders_csv, transport_csv, solutions_json, out_path="m
 
     random.shuffle(instances)
     split = max(1, int(0.9 * len(instances)))
-    train_ds = WarehouseGraphDataset(instances[:split], min_capacity_kg)
-    val_ds = WarehouseGraphDataset(instances[split:] or instances[-1:], min_capacity_kg)
+    train_ds = WarehouseGraphDataset(instances[:split], min_capacity_kg, DEFAULT_MAX_COURIERS)
+    val_ds = WarehouseGraphDataset(instances[split:] or instances[-1:], min_capacity_kg, DEFAULT_MAX_COURIERS)
     print(f"train warehouses: {len(train_ds)}, val warehouses: {len(val_ds)}")
 
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
