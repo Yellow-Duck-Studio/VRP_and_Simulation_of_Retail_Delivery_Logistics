@@ -1,9 +1,0 @@
-[
-  {
-    "source": "gnn",
-    "total_cost": 371909.6171,
-    "feasible_units": 35,
-    "total_units": 35,
-    "notes": "units = warehouses"
-  }
-]

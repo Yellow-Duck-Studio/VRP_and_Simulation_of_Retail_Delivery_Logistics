@@ -36,9 +36,12 @@ Thumbs.db
 data/runs/
 data/runs_reports/
 datasets/*/runs/
+datasets/enriched_runtime/
 
 # Local generated reports
 reports/*.json
 
 # Local model artifacts and ad-hoc outputs
+data/gnn_predictions*.json
+data/master_clusterizations_bruteforce.json
 *.log

@@ -1,4 +1,0 @@
-code,approx_speed_kmh,max_payload_kg,fixed_fee,per_km_fee,per_order_fee,per_kg_min_fee
-bike,15.0,10.0,0.0,50.0,100.0,0.0
-foot,5.0,10.0,0.0,30.0,80.0,0.0
-car,40.0,30.0,0.0,80.0,150.0,0.0

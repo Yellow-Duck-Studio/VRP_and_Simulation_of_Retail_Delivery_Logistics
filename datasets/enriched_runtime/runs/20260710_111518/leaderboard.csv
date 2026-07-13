@@ -1,2 +1,0 @@
-run_id,label,algorithm,fitness_version,total_tasks,total_clusterizations,valid_clusterizations,best_fitness_score,average_fitness_score,output_json,output_csv
-20260710_111518,enriched_clarke,clarke_wright,business_v1,10,10,3,106.9927425977722,908.7267863743828,datasets\enriched_runtime\runs\20260710_111518\clarke_wright\master_clusterizations.json,datasets\enriched_runtime\runs\20260710_111518\clarke_wright\master_clusterizations.csv
