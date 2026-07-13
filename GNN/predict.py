@@ -45,14 +45,10 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None
     if limit:
         instances = instances[:limit]
 
-    # группировка по task_id: каждый task_id -> список кластеризаций
-    # (здесь всегда одна кластеризация на task, т.к. GNN даёт одно решение)
-    tasks = {}  # task_id -> {"clusters": [...], "cost_sum": float, "is_valid": bool, "next_cluster_id": int}
+    results = []
     total_time = 0.0
-    n_warehouses = 0
 
     for inst in instances:
-        n_warehouses += 1
         orders_by_id = {o["order_id"]: o for o in inst.orders}
 
         # склад с 1 заказом — тривиальный случай, GNN не нужна
@@ -67,79 +63,67 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None
             pred_clusters = decode(model, graph, orders_by_id, inst.warehouse_lat, inst.warehouse_lon, tariffs)
             total_time += time.time() - t0
 
-        task_entry = tasks.setdefault(inst.task_id, {
-            "clusters": [],
-            "cost_sum": 0.0,
-            "is_valid": True,
-            "next_cluster_id": 1,
-        })
-
         # раскладка по каждому кластеру: транспорт, маршрут, cost
-        feasible_wh = True
+        cluster_details = []
+        feasible = True
         for cluster_ids in pred_clusters:
             sol = best_cluster_solution(
                 inst.warehouse_lat, inst.warehouse_lon,
                 [orders_by_id[oid] for oid in cluster_ids], tariffs,
             )
             if sol is None:
-                feasible_wh = False
-                task_entry["is_valid"] = False
-                task_entry["clusters"].append({
-                    "cluster_id": task_entry["next_cluster_id"],
-                    "warehouse_id": inst.warehouse_id,
-                    "transport_type": None,
-                    "order_ids": cluster_ids,
-                })
+                feasible = False
+                cluster_details.append({"order_ids": cluster_ids, "feasible": False})
             else:
-                task_entry["clusters"].append({
-                    "cluster_id": task_entry["next_cluster_id"],
-                    "warehouse_id": inst.warehouse_id,
-                    "transport_type": sol["transport"],
+                cluster_details.append({
                     "order_ids": cluster_ids,
+                    "feasible": True,
+                    "transport": sol["transport"],
+                    "order_sequence": sol["order_sequence"],
+                    "distance_km": round(sol["distance_km"], 4),
+                    "duration_min": round(sol["duration_min"], 2),
+                    "cost": round(sol["cost"], 4),
                 })
-                task_entry["cost_sum"] += sol["cost"]
-            task_entry["next_cluster_id"] += 1
 
         total_cost = clustering_total_cost(
             inst.warehouse_lat, inst.warehouse_lon, orders_by_id, pred_clusters, tariffs
         )
-        if total_cost is None:
-            task_entry["is_valid"] = False
 
-        status = "OK" if (feasible_wh and total_cost is not None) else "INFEASIBLE"
+        result = {
+            "task_id": inst.task_id,
+            "warehouse_id": inst.warehouse_id,
+            "num_orders": len(inst.orders),
+            "clusters": cluster_details,
+            "total_cost": round(total_cost, 4) if total_cost is not None else None,
+            "feasible": feasible and total_cost is not None,
+        }
+        results.append(result)
+
+        status = "OK" if result["feasible"] else "INFEASIBLE"
         print(f"[task {inst.task_id} wh {inst.warehouse_id}] {status} | "
-              f"{len(inst.orders)} заказов -> {len(pred_clusters)} кластеров")
+              f"{len(inst.orders)} заказов -> {len(pred_clusters)} кластеров | "
+              f"cost={result['total_cost']}")
 
-    # финальная сборка в требуемый формат
-    output = {}
-    for task_id, entry in tasks.items():
-        output[f"task_{task_id}"] = [{
-            "clusterization_id": 1,
-            "fitness_score": round(entry["cost_sum"], 4),
-            "is_valid": entry["is_valid"],
-            "clusters": entry["clusters"],
-        }]
-
-    n_ok = sum(1 for entry in tasks.values() if entry["is_valid"])
-    print(f"\nВсего складов: {n_warehouses}, задач: {len(tasks)}, допустимых задач: {n_ok}")
-    if n_warehouses:
-        print(f"среднее время decode на склад: {total_time/n_warehouses*1000:.1f} мс")
+    n_ok = sum(1 for r in results if r["feasible"])
+    print(f"\nВсего складов: {len(results)}, допустимых разбиений: {n_ok}")
+    if results:
+        print(f"среднее время decode на склад: {total_time/len(results)*1000:.1f} мс")
 
     if out_path:
         with open(out_path, "w") as f:
-            json.dump(output, f, ensure_ascii=False, indent=2)
+            json.dump(results, f, ensure_ascii=False, indent=2)
         print(f"результаты сохранены в {out_path}")
 
-    return output
+    return results
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--warehouses", required=False, default="../data/large/warehouses-L.csv", )
-    parser.add_argument("--orders", required=False, default="../data/large/orders-L.csv", )
+    parser.add_argument("--warehouses", required=False, default="../data/very_small/warehouses.csv", )
+    parser.add_argument("--orders", required=False, default="../data/very_small/orders.csv", )
     parser.add_argument("--transport", required=False, default="../data/transport_types.csv", )
     parser.add_argument("--model", default="../GNN/model.pt")
     parser.add_argument("--out", default="predictions.json")
-    parser.add_argument("--limit", type=int, default=10)
+    parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
     predict(args.warehouses, args.orders, args.transport, args.model, args.out, args.limit)
