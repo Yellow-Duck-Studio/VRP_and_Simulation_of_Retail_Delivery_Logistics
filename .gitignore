@@ -45,4 +45,6 @@ reports/*.json
 # Local model artifacts and ad-hoc outputs
 data/gnn_predictions*.json
 data/master_clusterizations_bruteforce.json
+data/embeddings*.json
+GNN/model_v2.pt
 *.log
