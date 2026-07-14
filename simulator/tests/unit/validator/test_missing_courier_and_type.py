@@ -27,7 +27,7 @@ from simulator.tests.conftest import (
 def _route_for_unknown_courier():
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.01, 48.0)
-    stop = make_stop("ORD1", delivery, StopType.DELIVERY, 1, arrival=BASE_TIME + minutes(30))
+    stop = make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(30))
     return make_route("R1", "GHOST_COURIER", wh, delivery, BASE_TIME, [stop])
 
 
@@ -49,7 +49,7 @@ def test_missing_courier_short_circuits_further_checks(fake_resolver):
     # out of the route entirely once the courier can't be resolved.
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.01, 48.0)
-    stop = make_stop("ORD1", delivery, StopType.DELIVERY, 1, arrival=BASE_TIME)
+    stop = make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME)
     route = make_route("R2", "GHOST", wh, delivery, BASE_TIME, [stop])
 
     validator = build_validator([], [make_courier_type()], [route], fake_resolver)
@@ -60,7 +60,7 @@ def test_missing_courier_short_circuits_further_checks(fake_resolver):
 def test_courier_with_unknown_courier_type_is_an_error_but_route_still_checked(fake_resolver):
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.01, 48.0)
-    stop = make_stop("ORD1", delivery, StopType.DELIVERY, 1, arrival=BASE_TIME + minutes(30))
+    stop = make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(30))
     route = make_route("R3", "C1", wh, delivery, BASE_TIME, [stop])
 
     courier = make_courier("C1", courier_type_id="UNKNOWN_TYPE")
@@ -71,7 +71,3 @@ def test_courier_with_unknown_courier_type_is_an_error_but_route_still_checked(f
     type_errors = [i for i in report.issues if i.issue_type == ValidationIssueType.MISSING_COURIER_TYPE]
     assert len(type_errors) == 1
     assert type_errors[0].severity == ValidationSeverity.ERROR
-    # Sequence/duplicate checks still ran (route is otherwise fine).
-    assert not any(
-        i.issue_type == ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE for i in report.issues
-    )

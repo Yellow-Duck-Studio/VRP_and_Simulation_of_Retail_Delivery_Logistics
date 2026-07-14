@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple
 from simulator.config.validator import ValidationConfig
 from simulator.engine.route_validator import TripConnectionValidator
 from simulator.engine.state_manager import StateManager
-from simulator.schemas import Courier, CourierType, Location, Route, RouteStop, StopType
+from simulator.schemas import Courier, CourierType, Location, Route, RouteStop, StopType, AffiliationType
 
 @pytest.fixture
 def sample_json_data():
@@ -27,10 +27,7 @@ def sample_json_data():
                 "order_id": "ord_1",
                 "warehouse_id": "wh_1",
                 "delivery_location": {"latitude": 55.75, "longitude": 37.61},
-                "delivery_time_window": {
-                    "start": now.isoformat(),
-                    "end": (now + timedelta(minutes=60)).isoformat()
-                },
+                "delivery_time_window_end": (now + timedelta(minutes=60)).isoformat(),
                 "mass_kg": 5.0,
                 "ready_time": now.isoformat(),
                 "status": "pending"
@@ -61,14 +58,12 @@ def sample_json_data():
                         "order_id": "ord_1",
                         "location": {"latitude": 55.7558, "longitude": 37.6173},
                         "stop_type": "pickup",
-                        "sequence_number": 1,
                         "service_duration_minutes": 5
                     },
                     {
                         "order_id": "ord_1",
                         "location": {"latitude": 55.75, "longitude": 37.61},
                         "stop_type": "delivery",
-                        "sequence_number": 2,
                         "service_duration_minutes": 3
                     }
                 ]
@@ -108,7 +103,6 @@ def make_stop(
     order_id: str,
     location: Location,
     stop_type: StopType,
-    sequence_number: int,
     arrival: Optional[datetime] = None,
     service_duration_minutes: float = 5.0,
 ) -> RouteStop:
@@ -116,7 +110,6 @@ def make_stop(
         order_id=order_id,
         location=location,
         stop_type=stop_type,
-        sequence_number=sequence_number,
         service_duration_minutes=service_duration_minutes,
         planned_arrival_time=arrival,
     )
@@ -149,7 +142,7 @@ def make_courier_type(type_id: str = "car", speed_kmh: float = 40.0, capacity_kg
 def make_courier(
     courier_id: str,
     courier_type_id: str = "car",
-    affiliation_type: str = "shift",
+    affiliation_type: AffiliationType = AffiliationType("shift"),
     current_location: Optional[Location] = None,
 ) -> Courier:
     return Courier(

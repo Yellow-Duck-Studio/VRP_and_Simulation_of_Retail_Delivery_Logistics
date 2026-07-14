@@ -51,19 +51,12 @@
             },
             "required": ["latitude", "longitude"]
           },
-          "delivery_time_window": {
-            "type": "object",
-            "properties": {
-              "start": { "type": "string", "format": "date-time" },
-              "end": { "type": "string", "format": "date-time" }
-            },
-            "required": ["start", "end"]
-          },
+          "delivery_time_window_end": { "type": "string", "format": "date-time" },
           "status": { "type": "string", "enum": ["pending", "assigned", "in_transit", "delivered", "cancelled"] },
           "mass_kg": { "type": "number", "exclusiveMinimum": 0 },
           "ready_time": { "type": "string", "format": "date-time" }
         },
-        "required": ["order_id", "warehouse_id", "delivery_location", "delivery_time_window", "mass_kg", "ready_time"]
+        "required": ["order_id", "warehouse_id", "delivery_location", "delivery_time_window_end", "mass_kg", "ready_time"]
       }
     },
     "couriers": {
@@ -134,10 +127,9 @@
                   "required": ["latitude", "longitude"]
                 },
                 "stop_type": { "type": "string", "enum": ["pickup", "delivery"] },
-                "sequence_number": { "type": "integer", "minimum": 1 },
                 "service_duration_minutes": { "type": "integer", "minimum": 0, "default": 5 }
               },
-              "required": ["order_id", "location", "stop_type", "sequence_number"]
+              "required": ["order_id", "location", "stop_type"]
             }
           }
         },

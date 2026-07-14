@@ -16,20 +16,11 @@ class Location(BaseModel):
     longitude: float = Field(..., ge=-180, le=180)
     address: Optional[str] = None
 
-
-class TimeWindow(BaseModel):
-    start: datetime
-    end: datetime
-    
-    def duration_minutes(self) -> int:
-        return int((self.end - self.start).total_seconds() / 60)
-
-
 class Order(BaseModel):
     order_id: str
     warehouse_id: str = Field(..., description="Warehouse this order is bound to")
     delivery_location: Location
-    delivery_time_window: TimeWindow
+    delivery_time_window_end: datetime
     status: OrderStatus = OrderStatus.PENDING
     created_at: datetime = Field(default_factory=datetime.now)
     assigned_courier_id: Optional[str] = None
@@ -45,7 +36,7 @@ class Order(BaseModel):
     @property
     def deadline(self) -> datetime:
         """Delivery deadline (from clustering task)"""
-        return self.delivery_time_window.end
+        return self.delivery_time_window_end
     
     @property
     def weight(self) -> float:
