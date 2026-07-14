@@ -1,25 +1,37 @@
+"""GNN model with context-aware, normalized order embeddings."""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch_geometric.nn import TransformerConv
 
 from config import (
-    NODE_FEATURE_DIM,
+    DROPOUT,
     EDGE_FEATURE_DIM,
     HIDDEN_DIM,
+    NODE_FEATURE_DIM,
     NUM_GNN_LAYERS,
     NUM_HEADS,
-    DROPOUT,
 )
 
 
 class GNNEncoder(nn.Module):
-    """Стек TransformerConv (GAT-подобный, учитывает edge_attr) с residual+LN."""
+    """Build an order embedding while keeping the existing graph interface."""
 
     def __init__(self):
         super().__init__()
-        self.input_proj = nn.Linear(NODE_FEATURE_DIM, HIDDEN_DIM)
-        self.edge_proj = nn.Linear(EDGE_FEATURE_DIM, HIDDEN_DIM)
+        self.node_feature_norm = nn.BatchNorm1d(NODE_FEATURE_DIM)
+        self.edge_feature_norm = nn.BatchNorm1d(EDGE_FEATURE_DIM)
+        self.input_proj = nn.Sequential(
+            nn.Linear(NODE_FEATURE_DIM, HIDDEN_DIM),
+            nn.GELU(),
+            nn.LayerNorm(HIDDEN_DIM),
+        )
+        self.edge_proj = nn.Sequential(
+            nn.Linear(EDGE_FEATURE_DIM, HIDDEN_DIM),
+            nn.GELU(),
+            nn.LayerNorm(HIDDEN_DIM),
+        )
 
         self.convs = nn.ModuleList()
         self.norms = nn.ModuleList()
@@ -35,43 +47,71 @@ class GNNEncoder(nn.Module):
             )
             self.norms.append(nn.LayerNorm(HIDDEN_DIM))
 
+        # The model learns how much local and multi-hop context to retain.
+        self.layer_mix_logits = nn.Parameter(torch.zeros(NUM_GNN_LAYERS + 1))
+        self.dropout = nn.Dropout(DROPOUT)
+        self.embedding_proj = nn.Sequential(
+            nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
+            nn.GELU(),
+            nn.Dropout(DROPOUT),
+            nn.Linear(HIDDEN_DIM, HIDDEN_DIM),
+        )
+
     def forward(self, x, edge_index, edge_attr):
-        h = self.input_proj(x)
-        e = self.edge_proj(edge_attr)
+        normalized_nodes = self.node_feature_norm(x)
+        normalized_edges = self.edge_feature_norm(edge_attr)
+        hidden = self.input_proj(normalized_nodes)
+        projected_edges = self.edge_proj(normalized_edges)
+
+        layer_states = [hidden]
         for conv, norm in zip(self.convs, self.norms):
-            h_new = conv(h, edge_index, e)
-            h = norm(h + F.relu(h_new))
-        return h  # [num_nodes, HIDDEN_DIM]
+            update = conv(hidden, edge_index, projected_edges)
+            hidden = norm(hidden + self.dropout(F.gelu(update)))
+            layer_states.append(hidden)
+
+        states = torch.stack(layer_states, dim=0)
+        weights = torch.softmax(self.layer_mix_logits, dim=0).view(-1, 1, 1)
+        mixed_context = (states * weights).sum(dim=0)
+        embedding = self.embedding_proj(mixed_context)
+        return F.normalize(embedding, p=2, dim=-1)
 
 
 class EdgeAffinityHead(nn.Module):
-    """Предсказывает logit того, что два заказа окажутся в одном кластере."""
+    """Predict a symmetric same-cluster affinity for each order pair."""
 
     def __init__(self):
         super().__init__()
         self.mlp = nn.Sequential(
             nn.Linear(HIDDEN_DIM * 3 + EDGE_FEATURE_DIM, HIDDEN_DIM),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Dropout(DROPOUT),
             nn.Linear(HIDDEN_DIM, HIDDEN_DIM // 2),
-            nn.ReLU(),
+            nn.GELU(),
             nn.Linear(HIDDEN_DIM // 2, 1),
         )
 
-    def forward(self, h, edge_index, edge_attr):
-        hi = h[edge_index[0]]
-        hj = h[edge_index[1]]
-        feat = torch.cat([hi, hj, torch.abs(hi - hj), edge_attr], dim=-1)
-        return self.mlp(feat).squeeze(-1)  # [num_edges]
+    def forward(self, embeddings, edge_index, edge_attr):
+        first = embeddings[edge_index[0]]
+        second = embeddings[edge_index[1]]
+        pair_features = torch.cat(
+            [first + second, torch.abs(first - second), first * second, edge_attr],
+            dim=-1,
+        )
+        return self.mlp(pair_features).squeeze(-1)
 
 
 class ClusteringGNN(nn.Module):
+    """Keep the original logits API and expose embeddings when needed."""
+
     def __init__(self):
         super().__init__()
         self.encoder = GNNEncoder()
         self.affinity_head = EdgeAffinityHead()
 
+    def encode(self, data):
+        return self.encoder(data.x, data.edge_index, data.edge_attr)
+
     def forward(self, data):
-        h = self.encoder(data.x, data.edge_index, data.edge_attr)
-        logits = self.affinity_head(h, data.edge_index, data.edge_attr)
-        return logits  # [num_edges], сырые логиты (sigmoid -> вероятность "один кластер")
+        embeddings = self.encode(data)
+        return self.affinity_head(embeddings, data.edge_index, data.edge_attr)
+
