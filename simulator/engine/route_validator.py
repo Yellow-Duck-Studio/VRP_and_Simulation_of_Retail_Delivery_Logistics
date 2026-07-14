@@ -194,13 +194,13 @@ class TripConnectionValidator:
         clean_routes = total_routes - len(routes_with_errors | routes_with_warnings)
 
         summary = {
-            "total_routes": total_routes,
-            "routes_with_errors": len(routes_with_errors),
-            "routes_with_warnings": len(routes_with_warnings),
-            "clean_routes": max(clean_routes, 0),
-            "clean_route_pct": round((clean_routes / total_routes) * 100, 1) if total_routes else 0.0,
-            "issues_by_severity": by_severity,
-            "issues_by_type": by_type,
+            "Total Routes": total_routes,
+            "Routes With Errors": len(routes_with_errors),
+            "Routes With Warnings": len(routes_with_warnings),
+            "Clean Routes": max(clean_routes, 0),
+            "Clean Route %": round((clean_routes / total_routes) * 100, 1) if total_routes else 0.0,
+            "Issues By Severity": by_severity,
+            "Issues By Type": by_type,
         }
         if hop_distances:
             summary["hop_distance_km"] = {
