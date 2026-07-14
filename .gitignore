@@ -1,7 +1,14 @@
-# Python caches
+# Python bytecode
 __pycache__/
 *.py[cod]
+*.pyo
 *$py.class
+
+# Python tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
 
 # Virtual environments
 .venv/
@@ -9,16 +16,27 @@ venv/
 env/
 ENV/
 
-# Tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
+# Packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Coverage
 .coverage
 .coverage.*
 htmlcov/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Logs
+*.log
+logs/
+
+# OS / editor files
+.DS_Store
+Thumbs.db
 
 # IDE / editor files
 .idea/
@@ -28,12 +46,21 @@ htmlcov/
 *.userossc
 *.sln.docstates
 
-# OS files
-.DS_Store
-Thumbs.db
+# Local environment files
+.env
+.env.*
+*.local
 
-# Local experiment outputs
+# Frontend / Node
+node_modules/
+
+# Generated experiment outputs
 data/runs/
+data/runs_smoke/
+data/runs_smoke2/
+data/runs_smoke3/
+data/runs_smoke_logs/
+data/runs_smoke_reasons/
 data/runs_reports/
 data/*/runs/
 datasets/*/runs/
@@ -45,4 +72,3 @@ reports/*.json
 # Local model artifacts and ad-hoc outputs
 data/gnn_predictions*.json
 data/master_clusterizations_bruteforce.json
-*.log
