@@ -50,11 +50,16 @@ def main():
         help="Path to output JSON file for results"
     )
     parser.add_argument(
+        "--report",
+        type=str,
+        default="report.txt",
+        help="Path to output txt file for report"
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="Fail fast if validation fails"
     )
-
     parser.add_argument(
         "--log-level",
         type=str,
@@ -169,7 +174,54 @@ def main():
 
     logger.info(f"Total delivery cost: {results['total_delivery_cost']:.2f} rub")
 
-    # Save results if output path specified
+    logger.info(f"{Colors.BLUE}------------------------------------ Info ------------------------------------{Colors.RESET}")
+
+    report_path = Path(args.report)
+
+    lines = [
+        f"----------------------------- Simulation Results -----------------------------"]
+
+    metrics = controller.get_metrics()
+    for key, value in metrics.items():
+        if isinstance(value, float):
+            if "rate" in key:
+                lines.append(f"{key}: {value:.2%}")
+            else:
+                lines.append(f"{key}: {value:.2f}")
+        else:
+            lines.append(f"{key}: {value}")
+
+    lines.append(
+        f"-------------------------------- Event Summary -------------------------------")
+    events = controller.event_manager.get_events()
+    lines.append(f"Total Events: {len(events)}")
+
+    from simulator.engine import EventType
+    for event_type in EventType:
+        event_count = len(controller.event_manager.get_events(event_type))
+        if event_count > 0:
+            lines.append(f"{event_type.value}: {event_count}")
+
+    results = controller.get_results()
+
+    lines.append(
+        f"------------------------------ Delivery Results ------------------------------")
+    for order_id, delivery_time in results["order_delivery_times"].items():
+        in_window = results["order_delivered_in_window"][order_id]
+        lines.append(f"Order {order_id}: delivered at {delivery_time}, in window: {in_window}")
+
+    lines.append(
+        f"------------------------------ Courier Payments ------------------------------")
+    for courier_id, payment in results["courier_payments"].items():
+        lines.append(f"Courier {courier_id}: {payment:.2f} rub")
+
+    lines.append(f"Total delivery cost: {results['total_delivery_cost']:.2f} rub")
+
+    with open(report_path, 'w', encoding='utf-8') as f:
+        f.write("\n".join(lines))
+
+    logger.info(f"Report saved to {args.report}")
+
     if args.output:
         output_path = Path(args.output)
         results_json = {
