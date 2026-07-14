@@ -144,7 +144,7 @@ def main():
     metrics = controller.get_metrics()
     for key, value in metrics.items():
         if isinstance(value, float):
-            if "rate" in key:
+            if "Rate" in key:
                 logger.info(f"{key}: {value:.2%}")
             else:
                 logger.info(f"{key}: {value:.2f}")
@@ -172,27 +172,24 @@ def main():
     for courier_id, payment in results["courier_payments"].items():
         logger.info(f"Courier {courier_id}: {payment:.2f} rub")
 
-    logger.info(f"Total delivery cost: {results['total_delivery_cost']:.2f} rub")
+    logger.info(f"Total Delivery Cost: {results['total_delivery_cost']:.2f} rub")
 
     logger.info(f"{Colors.BLUE}------------------------------------ Info ------------------------------------{Colors.RESET}")
 
     report_path = Path(args.report)
 
-    lines = [
-        f"----------------------------- Simulation Results -----------------------------"]
-
+    lines = [f"----------------------------- Simulation Results -----------------------------"]
     metrics = controller.get_metrics()
     for key, value in metrics.items():
         if isinstance(value, float):
-            if "rate" in key:
+            if "Rate" in key:
                 lines.append(f"{key}: {value:.2%}")
             else:
                 lines.append(f"{key}: {value:.2f}")
         else:
             lines.append(f"{key}: {value}")
 
-    lines.append(
-        f"-------------------------------- Event Summary -------------------------------")
+    lines.append(f"-------------------------------- Event Summary -------------------------------")
     events = controller.event_manager.get_events()
     lines.append(f"Total Events: {len(events)}")
 
@@ -204,18 +201,16 @@ def main():
 
     results = controller.get_results()
 
-    lines.append(
-        f"------------------------------ Delivery Results ------------------------------")
+    lines.append(f"------------------------------ Delivery Results ------------------------------")
     for order_id, delivery_time in results["order_delivery_times"].items():
         in_window = results["order_delivered_in_window"][order_id]
         lines.append(f"Order {order_id}: delivered at {delivery_time}, in window: {in_window}")
 
-    lines.append(
-        f"------------------------------ Courier Payments ------------------------------")
+    lines.append(f"------------------------------ Courier Payments ------------------------------")
     for courier_id, payment in results["courier_payments"].items():
         lines.append(f"Courier {courier_id}: {payment:.2f} rub")
 
-    lines.append(f"Total delivery cost: {results['total_delivery_cost']:.2f} rub")
+    lines.append(f"Total Delivery Cost: {results['total_delivery_cost']:.2f} rub")
 
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write("\n".join(lines))
