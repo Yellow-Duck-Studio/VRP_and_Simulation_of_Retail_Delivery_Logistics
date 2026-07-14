@@ -3,16 +3,16 @@ import time
 import torch
 import pandas as pd
 
-from config import DEVICE
+from config import DEVICE, DEFAULT_MAX_COURIERS
 from io_utils import load_instances, load_transport_types_with_optional_couriers
 from data import build_graph, normalize_edge_mass
 from model import ClusteringGNN
 from decode import decode
-from costs import clustering_total_cost
+from costs import clustering_total_cost, best_cluster_solution, required_couriers
 
 
 def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path,
-        limit=None, report_path=None, couriers_csv=None):
+        limit=None, report_path=None, couriers_csv=None, max_couriers=None):
     device = torch.device(DEVICE if torch.cuda.is_available() else "cpu")
     tariffs = load_transport_types_with_optional_couriers(transport_csv, couriers_csv=couriers_csv)
     min_capacity_kg = min(t.max_payload_kg for t in tariffs)
@@ -36,18 +36,45 @@ def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path,
         n_total += 1
         orders_by_id = {o["order_id"]: o for o in inst.orders}
 
-        graph = build_graph(inst)
+        # Приоритет источника max_couriers: явный CLI-аргумент (реальный штат
+        # смены, известен оператору на момент инференса) > значение из
+        # данных инстанса (что было в master.json на момент генерации
+        # датасета) > глобальный дефолт.
+        effective_max_couriers = max_couriers or inst.max_couriers or DEFAULT_MAX_COURIERS
+
+        graph = build_graph(inst, default_max_couriers=effective_max_couriers)
         graph.edge_attr = normalize_edge_mass(graph.edge_attr, min_capacity_kg)
         graph = graph.to(device)
 
         t0 = time.time()
-        pred_clusters = decode(model, graph, orders_by_id, inst.warehouse_lat, inst.warehouse_lon, tariffs)
+        pred_clusters = decode(model, graph, orders_by_id, inst.warehouse_lat, inst.warehouse_lon, tariffs,
+                                max_couriers=effective_max_couriers)
         decode_ms = (time.time() - t0) * 1000.0
         total_time += decode_ms / 1000.0
 
         pred_cost = clustering_total_cost(
             inst.warehouse_lat, inst.warehouse_lon, orders_by_id, pred_clusters, tariffs
         )
+
+        # Диагностика: сколько курьеров реально требует предсказание. Если
+        # оно всё ещё превышает effective_max_couriers, значит
+        # enforce_courier_capacity не смогла уложиться в штат (см. её
+        # docstring в decode.py — best-effort, не гарантия), и это стоит
+        # знать оператору, а не обнаружить постфактум в проде.
+        pred_required_couriers = None
+        if pred_cost is not None:
+            pred_sols = [
+                best_cluster_solution(inst.warehouse_lat, inst.warehouse_lon,
+                                       [orders_by_id[o] for o in c], tariffs)
+                for c in pred_clusters
+            ]
+            if all(s is not None for s in pred_sols):
+                pred_required_couriers = required_couriers(pred_sols)
+                if pred_required_couriers > effective_max_couriers:
+                    print(f"[task {inst.task_id} wh {inst.warehouse_id}] "
+                          f"WARNING: предсказание требует {pred_required_couriers} курьеров, "
+                          f"штат = {effective_max_couriers}")
+
         gt_cost = None
         if inst.clusters is not None:
             gt_cost = clustering_total_cost(
@@ -68,6 +95,8 @@ def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path,
             "task_id": inst.task_id,
             "warehouse_id": inst.warehouse_id,
             "n_orders": len(inst.orders),
+            "max_couriers": effective_max_couriers,
+            "pred_required_couriers": pred_required_couriers,
             "pred_feasible": pred_cost is not None,
             "pred_cost": pred_cost,
             "gt_cost": gt_cost,
@@ -120,6 +149,10 @@ if __name__ == "__main__":
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--report", default="comparison_report.csv",
                         help="path to write the detailed per-warehouse comparison CSV")
+    parser.add_argument("--max-couriers", type=int, default=None,
+                        help="Реальный штат курьеров на смену. Если не задан -- "
+                             "используется max_couriers из данных инстанса (если есть) "
+                             "или DEFAULT_MAX_COURIERS из config.py.")
     args = parser.parse_args()
     run(args.warehouses, args.orders, args.transport, args.solutions, args.model,
-        args.limit, args.report, args.couriers)
+        args.limit, args.report, args.couriers, args.max_couriers)

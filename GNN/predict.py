@@ -23,6 +23,7 @@ import time
 import torch
 
 from config import DEVICE
+from config import DEFAULT_MAX_COURIERS
 from io_utils import load_instances, load_transport_types_with_optional_couriers
 from data import build_graph, normalize_edge_mass
 from model import ClusteringGNN
@@ -54,7 +55,7 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None
         if len(inst.orders) < 2:
             pred_clusters = [[oid] for oid in orders_by_id]
         else:
-            graph = build_graph(inst)
+            graph = build_graph(inst, default_max_couriers=DEFAULT_MAX_COURIERS)
             graph.edge_attr = normalize_edge_mass(graph.edge_attr, min_capacity_kg)
             graph = graph.to(device)
 

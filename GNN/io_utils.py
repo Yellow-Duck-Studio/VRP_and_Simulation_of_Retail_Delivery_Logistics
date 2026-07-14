@@ -22,6 +22,21 @@ solutions.json (формат солвера, как в примере):
 как строк, если warehouse_id не приводится к int, иначе как чисел).
 ВАЖНО: если твой солвер пишет warehouse_id явно (например, дампит словарь
 {"1": [...], "2": [...]}), это тоже поддерживается — см. _match_solution.
+
+С тех пор как brute_force_ilp.py стал учитывать ограниченный штат курьеров
+(concurrency-constraint в ILP), каждый склад в solutions.json может
+опционально нести с собой то значение max_couriers, под которое его
+разбиение оптимизировано:
+{
+  "task_1": {
+      "1": {"clusters": [["1","2"]], "max_couriers": 3},
+      "2": {"clusters": [["3"]],     "max_couriers": 3}
+  }
+}
+Старый формат (голый список кластеров на склад, без max_couriers) по-прежнему
+поддерживается — тогда WarehouseInstance.max_couriers остаётся None, и
+дальше по пайплайну используется дефолт (см. GNN/config.py::DEFAULT_MAX_COURIERS).
+_match_solution понимает оба варианта.
 """
 
 import json
@@ -50,6 +65,7 @@ class WarehouseInstance:
     warehouse_lon: float
     orders: List[dict]                   # см. _order_row_to_dict
     clusters: Optional[List[List[str]]]  # ground-truth разбиение (order_id как str)
+    max_couriers: Optional[int] = None   # штат, под который optimized clusters (None = неизвестен/старый формат)
 
 
 def load_transport_types(path: str) -> List[TransportTariff]:
@@ -116,16 +132,35 @@ def _order_row_to_dict(row) -> dict:
     }
 
 
+def _unwrap_warehouse_solution(raw):
+    """
+    A per-warehouse entry in solutions.json can be either:
+      - the new format: {"clusters": [[...], ...], "max_couriers": M}
+      - the old format: a bare list of clusters, e.g. [["1","2"], ["3"]]
+    Returns (clusters, max_couriers), with max_couriers=None for the old
+    format or if the key is simply absent.
+    """
+    if raw is None:
+        return None, None
+    if isinstance(raw, dict) and "clusters" in raw:
+        return raw["clusters"], raw.get("max_couriers")
+    return raw, None  # old format: raw IS the list of clusters
+
+
 def _match_solution(sol_for_task, warehouse_ids_sorted: List[str], warehouse_id: str, w_idx: int):
-    """Поддерживает и list-по-позиции, и dict, keyed by warehouse_id."""
+    """Поддерживает и list-по-позиции, и dict, keyed by warehouse_id (оба
+    формата per-warehouse значений — см. _unwrap_warehouse_solution)."""
     if sol_for_task is None:
-        return None
+        return None, None
     if isinstance(sol_for_task, dict):
-        return sol_for_task.get(warehouse_id) or sol_for_task.get(str(warehouse_id))
+        raw = sol_for_task.get(warehouse_id)
+        if raw is None:
+            raw = sol_for_task.get(str(warehouse_id))
+        return _unwrap_warehouse_solution(raw)
     if isinstance(sol_for_task, list):
         if w_idx < len(sol_for_task):
-            return sol_for_task[w_idx]
-    return None
+            return _unwrap_warehouse_solution(sol_for_task[w_idx])
+    return None, None
 
 
 def load_instances(
@@ -157,7 +192,7 @@ def load_instances(
                 continue
             orders = [_order_row_to_dict(r) for r in order_rows.itertuples()]
 
-            clusters = _match_solution(sol_for_task, warehouse_ids_sorted, warehouse_id, w_idx)
+            clusters, max_couriers = _match_solution(sol_for_task, warehouse_ids_sorted, warehouse_id, w_idx)
             if clusters is not None:
                 clusters = [[str(oid) for oid in cluster] for cluster in clusters]
 
@@ -169,6 +204,7 @@ def load_instances(
                     warehouse_lon=float(wh_row["lon"]),
                     orders=orders,
                     clusters=clusters,
+                    max_couriers=max_couriers,
                 )
             )
     return instances
