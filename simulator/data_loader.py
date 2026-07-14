@@ -16,7 +16,7 @@ def parse_datetime(dt_str: str) -> datetime:
 
 def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     """Load data from JSON in StateManager."""
-    logger.info(f"Loading data from {json_path}")
+    logger.debug(f"Loading data from {json_path}")
     with open(json_path, 'r', encoding='utf-8') as f:
         data: Dict[str, Any] = json.load(f)
 
@@ -24,13 +24,13 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     courier_types_data = data.get("courier_types", [])
     for c_type_data in courier_types_data:
         state_manager.add_courier_type(CourierType(**c_type_data))
-    logger.info(f"Loaded {len(courier_types_data)} courier types")
+    logger.debug(f"Loaded {len(courier_types_data)} courier types")
 
     # Warehouses
     warehouses_data = data.get("warehouses", [])
     for w_data in warehouses_data:
         state_manager.add_warehouse(Warehouse(**w_data))
-    logger.info(f"Loaded {len(warehouses_data)} warehouses")
+    logger.debug(f"Loaded {len(warehouses_data)} warehouses")
 
     # Orders
     orders_data = data.get("orders", [])
@@ -40,7 +40,7 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
         if "delivery_time_window" in o_data:
             o_data["delivery_time_window_end"] = parse_datetime(o_data["delivery_time_window_end"])
         state_manager.add_order(Order(**o_data))
-    logger.info(f"Loaded {len(orders_data)} orders")
+    logger.debug(f"Loaded {len(orders_data)} orders")
 
     # Couriers
     couriers_data = data.get("couriers", [])
@@ -48,7 +48,7 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
         if "last_updated" in c_data and isinstance(c_data["last_updated"], str):
             c_data["last_updated"] = parse_datetime(c_data["last_updated"])
         state_manager.add_courier(Courier(**c_data))
-    logger.info(f"Loaded {len(couriers_data)} couriers")
+    logger.debug(f"Loaded {len(couriers_data)} couriers")
 
     # Routes
     routes_data = data.get("routes", [])
@@ -70,7 +70,7 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
 
         state_manager.add_route(route)
         logger.debug(f"Route {route.route_id}: {len(route.stops)} stops")
-    logger.info(f"Loaded {len(routes_data)} routes")
+    logger.debug(f"Loaded {len(routes_data)} routes")
 
     # Distance matrices
     raw_matrix = data.get("distance_matrix", [])
@@ -78,13 +78,13 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
     for entry in raw_matrix:
         matrix_dict[(entry["from_id"], entry["to_id"])] = float(entry["distance"])
     state_manager.set_distance_matrix(DistanceMatrix.from_dict(matrix_dict))
-    logger.info(f"Loaded {len(raw_matrix)} distance entries")
+    logger.debug(f"Loaded {len(raw_matrix)} distance entries")
 
     # Payment config
     payment_config = data.get("payment_config", {})
     if payment_config:
         state_manager.payment_config = payment_config
-        logger.info("Loaded payment config from input")
+        logger.debug("Loaded payment config from input")
     else: # Fallback
         state_manager.payment_config = {
             "rate_per_km": {"car": 50.0, "moped": 40.0, "foot": 25.0},
@@ -95,4 +95,4 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
         }
         logger.warning("No payment config in input; using fallback defaults")
 
-    logger.info("Data loading complete")
+    logger.debug("Data loading complete")

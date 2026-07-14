@@ -118,10 +118,10 @@ def main():
         logger.debug(f"    Ready Time: {order.ready_time.strftime('%H:%M')}")
         logger.debug(f"    Status: {order.status}")
 
-    logger.info(f"{Colors.BLUE}----------------------------- Running Simulation -----------------------------{Colors.RESET}")
-    logger.info(f"Start Time: {start_time.isoformat()}")
-    logger.info(f"Time Step: {args.time_step} minutes")
-    logger.info(f"Max Steps: {args.max_steps}")
+    logger.debug(f"{Colors.BLUE}----------------------------- Running Simulation -----------------------------{Colors.RESET}")
+    logger.debug(f"Start Time: {start_time.isoformat()}")
+    logger.debug(f"Time Step: {args.time_step} minutes")
+    logger.debug(f"Max Steps: {args.max_steps}")
 
     controller.run(max_steps=args.max_steps)
 
