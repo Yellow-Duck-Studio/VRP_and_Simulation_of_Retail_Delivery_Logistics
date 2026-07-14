@@ -138,15 +138,9 @@ class CourierFSM:
                 )
                 self.move_to_next_stop(current_time)
                 return
-            if current_time < order.delivery_time_window.start:
-                wait_seconds = (order.delivery_time_window.start - current_time).total_seconds()
-                self.logger.debug(f"{current_time} Order {order.order_id} delivery window not open, waiting {wait_seconds:.1f}s")
-                self.progress["arrival_time"] = current_time + timedelta(seconds=wait_seconds)
-                return
 
-            # Deliver
-            self.logger.info(f"{current_time} Delivering order {order.order_id}")
-            in_window = order.delivery_time_window.start <= current_time <= order.delivery_time_window.end
+            self.logger.debug(f"{current_time} Delivering order {order.order_id}")
+            in_window = current_time <= order.delivery_time_window_end
             order_fsm.deliver(current_time, in_window)
 
             self.state_manager.delivery_results[order.order_id] = {
