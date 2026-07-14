@@ -38,8 +38,7 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
         if isinstance(o_data.get("ready_time"), str):
             o_data["ready_time"] = parse_datetime(o_data["ready_time"])
         if "delivery_time_window" in o_data:
-            o_data["delivery_time_window"]["start"] = parse_datetime(o_data["delivery_time_window"]["start"])
-            o_data["delivery_time_window"]["end"] = parse_datetime(o_data["delivery_time_window"]["end"])
+            o_data["delivery_time_window_end"] = parse_datetime(o_data["delivery_time_window_end"])
         state_manager.add_order(Order(**o_data))
     logger.info(f"Loaded {len(orders_data)} orders")
 
@@ -65,12 +64,10 @@ def load_simulation_data(json_path: str, state_manager: StateManager) -> None:
                 order_id=stop_data["order_id"],
                 location=Location(**location_data),
                 stop_type=stop_data["stop_type"],
-                sequence_number=stop_data["sequence_number"],
                 service_duration_minutes=stop_data.get("service_duration_minutes", 5),
             )
             route.stops.append(stop)
 
-        route.stops.sort(key=lambda s: s.sequence_number)
         state_manager.add_route(route)
         logger.debug(f"Route {route.route_id}: {len(route.stops)} stops")
     logger.info(f"Loaded {len(routes_data)} routes")

@@ -82,8 +82,8 @@ class TripConnectionValidator:
             ))
             courier_type = None
 
-        stops = sorted(route.stops, key=lambda s: s.sequence_number)
-        issues.extend(self._check_sequence_integrity(route, stops))
+        stops = route.stops
+        # issues.extend(self._check_sequence_integrity(route, stops))
         issues.extend(self._check_duplicate_stops(route, stops))
 
         # Build full node chain: declared start -> stops... -> declared end
@@ -123,31 +123,31 @@ class TripConnectionValidator:
 
         return issues, hop_distances
 
-    @staticmethod
-    def _check_sequence_integrity(route: Route, stops: List[RouteStop]) -> List[ValidationIssue]:
-        issues = []
-        seen = set()
-        for stop in stops:
-            if stop.sequence_number in seen:
-                issues.append(ValidationIssue(
-                    ValidationSeverity.ERROR, ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE,
-                    route.route_id, f"Duplicate sequence_number {stop.sequence_number} "
-                                     f"in route {route.route_id}",
-                    {"sequence_number": stop.sequence_number},
-                ))
-            seen.add(stop.sequence_number)
-
-        expected = list(range(1, len(stops) + 1))
-        actual = sorted(seen)
-        if actual != expected:
-            issues.append(ValidationIssue(
-                ValidationSeverity.WARNING, ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE,
-                route.route_id,
-                f"Route {route.route_id} sequence numbers {actual} are not a contiguous "
-                f"1..{len(stops)} run - possible gap from removed/unassigned stops",
-                {"expected": expected, "actual": actual},
-            ))
-        return issues
+    # @staticmethod
+    # def _check_sequence_integrity(route: Route, stops: List[RouteStop]) -> List[ValidationIssue]:
+    #     issues = []
+    #     seen = set()
+    #     for stop in stops:
+    #         if stop.sequence_number in seen:
+    #             issues.append(ValidationIssue(
+    #                 ValidationSeverity.ERROR, ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE,
+    #                 route.route_id, f"Duplicate sequence_number {stop.sequence_number} "
+    #                                  f"in route {route.route_id}",
+    #                 {"sequence_number": stop.sequence_number},
+    #             ))
+    #         seen.add(stop.sequence_number)
+    #
+    #     expected = list(range(1, len(stops) + 1))
+    #     actual = sorted(seen)
+    #     if actual != expected:
+    #         issues.append(ValidationIssue(
+    #             ValidationSeverity.WARNING, ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE,
+    #             route.route_id,
+    #             f"Route {route.route_id} sequence numbers {actual} are not a contiguous "
+    #             f"1..{len(stops)} run - possible gap from removed/unassigned stops",
+    #             {"expected": expected, "actual": actual},
+    #         ))
+    #     return issues
 
     @staticmethod
     def _check_duplicate_stops(route: Route, stops: List[RouteStop]) -> List[ValidationIssue]:

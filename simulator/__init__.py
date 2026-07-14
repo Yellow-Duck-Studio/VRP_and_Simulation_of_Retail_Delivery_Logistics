@@ -21,7 +21,6 @@ __all__ = [
     "Order",
     "OrderStatus",
     "Location",
-    "TimeWindow",
     "Warehouse",
     "Courier",
     "CourierStatus",

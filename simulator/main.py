@@ -114,7 +114,7 @@ def main():
     for o_id, order in controller.state_manager.orders.items():
         logger.debug(f"    Warehouse ID: {order.warehouse_id}")
         logger.debug(f"    Mass: {order.mass_kg} kg")
-        logger.debug(f"    Time Window: {order.delivery_time_window.start.strftime('%H:%M')} - {order.delivery_time_window.end.strftime('%H:%M')}")
+        logger.debug(f"    Delivery Window End: {order.delivery_time_window_end.strftime('%H:%M')}")
         logger.debug(f"    Ready Time: {order.ready_time.strftime('%H:%M')}")
         logger.debug(f"    Status: {order.status}")
 

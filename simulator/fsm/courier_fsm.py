@@ -115,15 +115,8 @@ class CourierFSM:
                 self.move_to_next_stop(current_time, service_time=stop.service_duration_minutes)
 
         elif stop.stop_type == StopType.DELIVERY:
-            if current_time < order.delivery_time_window.start:
-                wait_seconds = (order.delivery_time_window.start - current_time).total_seconds()
-                self.logger.debug(f"{current_time} Order {order.order_id} delivery window not open, waiting {wait_seconds:.1f}s")
-                self.progress["arrival_time"] = current_time + timedelta(seconds=wait_seconds)
-                return
-
-            # Deliver
             self.logger.info(f"{current_time} Delivering order {order.order_id}")
-            in_window = order.delivery_time_window.start <= current_time <= order.delivery_time_window.end
+            in_window = current_time <= order.delivery_time_window_end
             order_fsm.deliver(current_time, in_window)
 
             self.state_manager.delivery_results[order.order_id] = {
@@ -139,7 +132,7 @@ class CourierFSM:
             self.courier.current_location = stop.location
             self.move_to_next_stop(current_time, service_time=stop.service_duration_minutes)
 
-    def move_to_next_stop(self, current_time: datetime, service_time: int = 0) -> None:
+    def move_to_next_stop(self, current_time: datetime, service_time: float = 0) -> None:
         """Plan next stop after service."""
         route = self.state_manager.routes.get(self.progress["current_route_id"])
         if not route:
