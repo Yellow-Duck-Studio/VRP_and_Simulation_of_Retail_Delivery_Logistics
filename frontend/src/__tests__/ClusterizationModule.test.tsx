@@ -1,11 +1,10 @@
-// src/__tests__/ClusterizationModule.test.tsx
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ClusterProgressEvent } from '../api';
+import type { ClusterProgressEvent, AllResults } from '../api';
 import * as api from '../api';
 import { MockWebSocket } from '../__mocks__/websocket';
-import ClusterizationModule from "../components/ClusterizationModule.tsx";
+import ClusterizationModule from '../components/ClusterizationModule';
 
 // ─── Mocks ──────────────────────────────────────
 vi.mock('../api');
@@ -59,44 +58,62 @@ describe('ClusterizationModule', () => {
   });
 
   it('calls runClusteringWithProgress and displays progress logs', async () => {
+    let resolveClustering: (value: AllResults) => void = () => {};
+    const clusteringPromise = new Promise<AllResults>((resolve) => {
+      resolveClustering = resolve;
+    });
+
     mockedApi.runClusteringWithProgress.mockImplementation(
-      (_algorithms: string[], onEvent: (e: ClusterProgressEvent) => void) =>
-        new Promise((resolve) => {
-          onEvent({ type: 'algo_start', algorithm: 'GNN' });
-          onEvent({ type: 'log', algorithm: 'GNN', line: 'Loading data...' });
-          onEvent({ type: 'algo_done', algorithm: 'GNN', data: [
-            {
-              task_id: "1",
-              warehouse_id: "1",
-              num_orders: 2,
-              clusters: [
-                { order_ids: ["1"], feasible: true, transport: "bike", order_sequence: ["1"] },
-                { order_ids: ["2"], feasible: true, transport: "bike", order_sequence: ["2"] }
-              ],
-              total_cost: 100,
-              feasible: true
-            }
-          ] });
-          onEvent({ type: 'done' });
-          setTimeout(() => resolve({}), 0);
-        })
+      (_algorithms: string[], _dataset: string, onEvent: (e: ClusterProgressEvent) => void) => {
+        onEvent({ type: 'algo_start', algorithm: 'GNN' });
+        onEvent({ type: 'log', algorithm: 'GNN', line: 'Loading data...' });
+        onEvent({ type: 'algo_done', algorithm: 'GNN', data: [
+          {
+            task_id: '1',
+            warehouse_id: '1',
+            num_orders: 2,
+            clusters: [
+              {
+                order_ids: ['1'],
+                feasible: true,
+                transport: 'bike',
+                order_sequence: ['1'],
+                distance_km: 0.5,
+                duration_min: 2,
+                cost: 10.0,
+              },
+              {
+                order_ids: ['2'],
+                feasible: true,
+                transport: 'bike',
+                order_sequence: ['2'],
+                distance_km: 0.7,
+                duration_min: 3,
+                cost: 15.0,
+              },
+            ],
+          },
+        ] });
+        onEvent({ type: 'done' });
+        return clusteringPromise;
+      }
     );
 
     render(<ClusterizationModule />);
     await selectAlgorithm('GNN');
 
-    // Fire click synchronously – does NOT wait for the async handler to finish
-    fireEvent.click(screen.getByRole('button', { name: /run/i }));
+    await clickRun();
 
-    // Now the loading state should be visible (spinner is in the DOM)
-    expect(document.querySelector('.animate-spin')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /run/i })).toBeDisabled();
 
-    // Wait for clustering to complete
+    setTimeout(() => resolveClustering({}), 0);
+
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /run/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /run/i })).toBeEnabled();
     });
-  });
 
+    expect(screen.getByText('Loading data...')).toBeInTheDocument();
+  });
 
   it('shows alert on clustering failure', async () => {
     const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
@@ -107,7 +124,7 @@ describe('ClusterizationModule', () => {
     await clickRun();
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Clasterization failed: Error: Something broke');
+      expect(alertSpy).toHaveBeenCalledWith('Clustering failed: Error: Something broke');
     });
 
     alertSpy.mockRestore();
