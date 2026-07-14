@@ -4,17 +4,18 @@ from datetime import datetime
 from typing import List, Callable, Optional, Dict
 
 class EventType(str, Enum):
-    ORDER_CREATED = "order_created"
-    ORDER_ASSIGNED = "order_assigned"
-    COURIER_DEPARTED = "courier_departed"
-    COURIER_ARRIVED = "courier_arrived"
-    ORDER_DELIVERED = "order_delivered"
-    COURIER_RETURNED = "courier_returned"
-    SIMULATION_STARTED = "simulation_started"
-    SIMULATION_ENDED = "simulation_ended"
-    PAYMENT_SENT = "payment_sent"
-    ROUTE_VALIDATION_PASSED = "route_validation_passed"
-    ROUTE_VALIDATION_FAILED = "route_validation_failed"
+    ORDER_CREATED = "Order Created"
+    ORDER_ASSIGNED = "Order Assigned"
+    ORDER_DELIVERED = "Order Delivered"
+    ORDER_CANCELLED = "Order Cancelled"
+    COURIER_DEPARTED = "Courier Departed"
+    COURIER_ARRIVED = "Courier Arrived"
+    COURIER_RETURNED = "Courier Returned"
+    SIMULATION_STARTED = "Simulation Started"
+    SIMULATION_ENDED = "Simulation Ended"
+    PAYMENT_SENT = "Payment Sent"
+    ROUTE_VALIDATION_PASSED = "Route Validation Passed"
+    ROUTE_VALIDATION_FAILED = "Route Validation Failed"
 
 @dataclass
 class Event:

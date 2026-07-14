@@ -3,7 +3,7 @@ from typing import Dict
 from ..engine.event_manager import EventType, Event, EventManager
 from ..engine.state_manager import StateManager
 from ..engine.location_resolver import LocationResolver
-from ..schemas import Courier, CourierStatus, StopType, Location
+from ..schemas import Courier, CourierStatus, StopType, Location, OrderStatus
 from .order_fsm import OrderFSM
 from ..utils import PaymentCalculator, get_logger
 
@@ -106,6 +106,23 @@ class CourierFSM:
                 return
             else:
                 # Pickup
+                courier_type = self.state_manager.courier_types.get(self.courier.courier_type_id)
+                if courier_type is None:
+                    self.logger.error(f"{current_time} Courier type {self.courier.courier_type_id} not found")
+                    self.move_to_next_stop(current_time)
+                    return
+                available_capacity = courier_type.capacity_kg - self.courier.current_load
+                if order.mass_kg > available_capacity:
+                    self.logger.error(
+                        f"{current_time} Order {order.order_id} (mass {order.mass_kg} kg) "
+                        f"exceeds courier {self.courier.courier_id} available capacity "
+                        f"({available_capacity:.1f} kg / {courier_type.capacity_kg} kg total). "
+                        f"Skipping pickup."
+                    )
+                    order_fsm.cancel(current_time)
+                    self.move_to_next_stop(current_time)
+                    return
+
                 self.logger.info(f"{current_time} Pickup order {order.order_id}")
                 order_fsm.assign_to_courier(self.courier.courier_id, current_time)
                 order_fsm.pickup(current_time)
@@ -115,6 +132,12 @@ class CourierFSM:
                 self.move_to_next_stop(current_time, service_time=stop.service_duration_minutes)
 
         elif stop.stop_type == StopType.DELIVERY:
+            if order.status != OrderStatus.ASSIGNED and order.status != OrderStatus.IN_TRANSIT:
+                self.logger.warning(
+                    f"{current_time} Order {order.order_id} not picked up (status {order.status}), skipping delivery"
+                )
+                self.move_to_next_stop(current_time)
+                return
             if current_time < order.delivery_time_window.start:
                 wait_seconds = (order.delivery_time_window.start - current_time).total_seconds()
                 self.logger.debug(f"{current_time} Order {order.order_id} delivery window not open, waiting {wait_seconds:.1f}s")

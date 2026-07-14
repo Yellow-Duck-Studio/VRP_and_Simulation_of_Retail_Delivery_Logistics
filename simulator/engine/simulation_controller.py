@@ -80,7 +80,10 @@ class SimulationController:
                          f"{len(self.state_manager.couriers)} couriers, "
                          f"{len(self.state_manager.routes)} routes")
 
-        report = self.validate_routes()
+        if self.validation_report is None:
+            report = self.validate_routes()
+        else:
+            report = self.validation_report
         if self.strict_validation and not report.is_valid:
             raise ValueError(
                 f"Route validation failed with "
@@ -161,9 +164,6 @@ class SimulationController:
         ))
         current_time = self.time_manager.advance()
         self.logger.info(f"{current_time} Simulation finished")
-        metrics = self.get_metrics()
-        self.logger.info(f"{current_time} Delivered: {metrics['delivered_orders']}/{metrics['total_orders']}, "
-                         f"SLA hit rate: {metrics['sla_hit_rate']:.2%}")
 
     def stop(self) -> None:
         self.is_running = False

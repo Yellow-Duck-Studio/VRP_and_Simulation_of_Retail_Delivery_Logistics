@@ -54,9 +54,9 @@ def test_report_with_only_clean_routes_is_valid(fake_resolver):
     )
     report = validator.validate_all()
     assert report.is_valid
-    assert report.summary["total_routes"] == 2
-    assert report.summary["routes_with_errors"] == 0
-    assert report.summary["clean_route_pct"] == 100.0
+    assert report.summary["Total Routes"] == 2
+    assert report.summary["Routes With Errors"] == 0
+    assert report.summary["Clean Route %"] == 100.0
 
 
 def test_report_with_any_error_is_invalid_and_summarised(fake_resolver):
@@ -69,12 +69,12 @@ def test_report_with_any_error_is_invalid_and_summarised(fake_resolver):
     report = validator.validate_all()
 
     assert not report.is_valid
-    assert report.summary["total_routes"] == 2
-    assert report.summary["routes_with_errors"] == 1
-    assert report.summary["clean_routes"] == 1
-    assert report.summary["issues_by_severity"][ValidationSeverity.ERROR.value] >= 1
+    assert report.summary["Total Routes"] == 2
+    assert report.summary["Routes With Errors"] == 1
+    assert report.summary["Clean Routes"] == 1
+    assert report.summary["Issues By Severity"][ValidationSeverity.ERROR.value] >= 1
     assert (
-        report.summary["issues_by_type"][ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE.value] >= 1
+        report.summary["Issues By Type"][ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE.value] >= 1
     )
 
 
@@ -94,15 +94,15 @@ def test_issues_for_filters_by_route_id(fake_resolver):
 
 
 def test_summary_includes_issues_by_type(fake_resolver):
-    # Simply verify that the summary includes issues_by_type dict
+    # Simply verify that the summary includes Issues By Type dict
     matrix = FakeDistanceMatrix()
     routes = [_clean_route("R1", fake_resolver, matrix)]
     validator = build_validator(
         [make_courier("C1")], [make_courier_type()], routes, fake_resolver, matrix=matrix,
     )
     report = validator.validate_all()
-    assert "issues_by_type" in report.summary
-    assert isinstance(report.summary["issues_by_type"], dict)
+    assert "Issues By Type" in report.summary
+    assert isinstance(report.summary["Issues By Type"], dict)
 
 
 def test_report_to_dict_round_trips_key_fields(fake_resolver):

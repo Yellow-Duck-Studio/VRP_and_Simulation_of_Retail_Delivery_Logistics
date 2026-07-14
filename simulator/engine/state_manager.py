@@ -62,11 +62,11 @@ class StateManager:
         sla_hits = sum(1 for res in self.delivery_results.values() if res.get("sla_met", False))
 
         return {
-            "total_orders": total_orders,
-            "delivered_orders": delivered_orders,
-            "sla_hit_rate": sla_hits / total_orders if total_orders > 0 else 0,
-            "pending_orders": len(self.get_pending_orders()),
-            "total_couriers": len(self.couriers),
-            "available_couriers": len(self.get_available_couriers()),
-            "simulation_steps": len(self.history),
+            "Total Orders": total_orders,
+            "Delivered Orders": delivered_orders,
+            "SLA Hit Rate": sla_hits / total_orders if total_orders > 0 else 0,
+            "Pending Orders": len(self.get_pending_orders()),
+            "Total Couriers": len(self.couriers),
+            "Available Couriers": len(self.get_available_couriers()),
+            "Simulation Steps": len(self.history),
         }
