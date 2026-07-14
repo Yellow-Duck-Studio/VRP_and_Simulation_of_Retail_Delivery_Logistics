@@ -124,7 +124,7 @@ describe('ClusterizationModule', () => {
     await clickRun();
 
     await waitFor(() => {
-      expect(alertSpy).toHaveBeenCalledWith('Clustering failed: Error: Something broke');
+      expect(alertSpy).toHaveBeenCalledWith('Clasterization failed: Error: Something broke');
     });
 
     alertSpy.mockRestore();
