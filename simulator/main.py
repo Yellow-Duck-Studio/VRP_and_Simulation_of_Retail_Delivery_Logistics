@@ -95,7 +95,7 @@ def main():
         strict_validation=args.strict
     )
 
-    logger.info(f"{Colors.BLUE}------------------------------- Data Loading -------------------------------{Colors.RESET}")
+    logger.info(f"{Colors.BLUE}-------------------------------- Data Loading --------------------------------{Colors.RESET}")
     logger.info(f"Loading simulation data from {input_path}...")
     load_simulation_data(str(input_path), controller.state_manager)
 
