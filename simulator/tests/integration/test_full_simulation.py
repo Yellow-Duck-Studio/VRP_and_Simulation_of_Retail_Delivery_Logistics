@@ -61,10 +61,7 @@ def test_capacity_exceeded():
                 "order_id": "heavy_order",
                 "warehouse_id": "wh_1",
                 "delivery_location": {"latitude": 55.75, "longitude": 37.61},
-                "delivery_time_window": {
-                    "start": (start_time + timedelta(minutes=10)).isoformat(),
-                    "end": (start_time + timedelta(minutes=60)).isoformat()
-                },
+                "delivery_time_window_end": (start_time + timedelta(minutes=60)).isoformat(),
                 "mass_kg": 15.0,  # Exceeds courier capacity (10 kg)
                 "ready_time": (start_time + timedelta(minutes=5)).isoformat()
             }
@@ -95,14 +92,12 @@ def test_capacity_exceeded():
                         "order_id": "heavy_order",
                         "location": {"latitude": 55.7558, "longitude": 37.6173},
                         "stop_type": "pickup",
-                        "sequence_number": 1,
                         "service_duration_minutes": 5
                     },
                     {
                         "order_id": "heavy_order",
                         "location": {"latitude": 55.75, "longitude": 37.61},
                         "stop_type": "delivery",
-                        "sequence_number": 2,
                         "service_duration_minutes": 3
                     }
                 ]
@@ -143,8 +138,3 @@ def test_capacity_exceeded():
 
     finally:
         Path(temp_path).unlink(missing_ok=True)
-
-def test_order_not_ready():
-    """Order is not ready before start"""
-    # for future
-    pass
