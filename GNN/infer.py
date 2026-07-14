@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 
 from config import DEVICE, DEFAULT_MAX_COURIERS
-from io_utils import load_instances, load_transport_types
+from io_utils import load_instances, load_transport_types_with_optional_couriers
 from data import build_graph, normalize_edge_mass
 from model import ClusteringGNN
 from decode import decode
@@ -12,9 +12,9 @@ from costs import clustering_total_cost, best_cluster_solution, required_courier
 
 
 def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path,
-        limit=None, report_path=None, max_couriers=None):
+        limit=None, report_path=None, couriers_csv=None, max_couriers=None):
     device = torch.device(DEVICE if torch.cuda.is_available() else "cpu")
-    tariffs = load_transport_types(transport_csv)
+    tariffs = load_transport_types_with_optional_couriers(transport_csv, couriers_csv=couriers_csv)
     min_capacity_kg = min(t.max_payload_kg for t in tariffs)
 
     model = ClusteringGNN().to(device)
@@ -139,10 +139,12 @@ def run(warehouses_csv, orders_csv, transport_csv, solutions_json, model_path,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--warehouses", required=False, default="data/large/warehouses.csv",)
-    parser.add_argument("--orders", required=False, default="data/large/orders.csv",)
-    parser.add_argument("--transport", required=False, default="data/transport_types.csv",)
-    parser.add_argument("--solutions", default="data/large/ilp_master.json", help="опционально: solutions.json для сравнения с оптимумом солвера")
+    parser.add_argument("--warehouses", default="data/large/warehouses.csv")
+    parser.add_argument("--orders", default="data/large/orders.csv")
+    parser.add_argument("--transport", default="data/transport_types.csv")
+    parser.add_argument("--solutions", default="data/large/ilp_master.json",
+                        help="Optional solutions.json for comparison against a reference partition.")
+    parser.add_argument("--couriers", default=None)
     parser.add_argument("--model", default="GNN/model.pt")
     parser.add_argument("--limit", type=int, default=None)
     parser.add_argument("--report", default="comparison_report.csv",
@@ -153,4 +155,4 @@ if __name__ == "__main__":
                              "или DEFAULT_MAX_COURIERS из config.py.")
     args = parser.parse_args()
     run(args.warehouses, args.orders, args.transport, args.solutions, args.model,
-        args.limit, args.report, args.max_couriers)
+        args.limit, args.report, args.couriers, args.max_couriers)

@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *.pyo
+*$py.class
 
 # Python tooling caches
 .pytest_cache/
@@ -36,8 +37,14 @@ logs/
 # OS / editor files
 .DS_Store
 Thumbs.db
+
+# IDE / editor files
 .idea/
 .vscode/
+*.suo
+*.user
+*.userossc
+*.sln.docstates
 
 # Local environment files
 .env
@@ -54,3 +61,14 @@ data/runs_smoke2/
 data/runs_smoke3/
 data/runs_smoke_logs/
 data/runs_smoke_reasons/
+data/runs_reports/
+data/*/runs/
+datasets/*/runs/
+datasets/enriched_runtime/
+
+# Local generated reports
+reports/*.json
+
+# Local model artifacts and ad-hoc outputs
+data/gnn_predictions*.json
+data/master_clusterizations_bruteforce.json

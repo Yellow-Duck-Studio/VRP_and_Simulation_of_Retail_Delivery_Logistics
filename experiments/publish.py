@@ -25,9 +25,12 @@ def publish_algorithm_run(
     shutil.copyfile(source_csv, target_csv)
 
     submission_path = data_dir / "final_submission.csv"
+    transport_path = data_dir / "transport_types.csv"
+    if not transport_path.exists():
+        transport_path = data_dir.parent / "transport_types.csv"
     build_submission_file(
         warehouses_path=data_dir / "warehouses.csv",
-        transport_types_path=data_dir / "transport_types.csv",
+        transport_types_path=transport_path,
         orders_path=data_dir / "orders.csv",
         clusterizations_csv_path=target_csv,
         output_path=submission_path,

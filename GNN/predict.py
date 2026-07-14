@@ -24,16 +24,16 @@ import torch
 
 from config import DEVICE
 from config import DEFAULT_MAX_COURIERS
-from io_utils import load_instances, load_transport_types
+from io_utils import load_instances, load_transport_types_with_optional_couriers
 from data import build_graph, normalize_edge_mass
 from model import ClusteringGNN
 from decode import decode
 from costs import best_cluster_solution, clustering_total_cost
 
 
-def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None, limit=None):
+def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None, limit=None, couriers_csv=None):
     device = torch.device(DEVICE if torch.cuda.is_available() else "cpu")
-    tariffs = load_transport_types(transport_csv)
+    tariffs = load_transport_types_with_optional_couriers(transport_csv, couriers_csv=couriers_csv)
     min_capacity_kg = min(t.max_payload_kg for t in tariffs)
 
     model = ClusteringGNN().to(device)
@@ -119,11 +119,12 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--warehouses", required=False, default="../data/very_small/warehouses.csv", )
-    parser.add_argument("--orders", required=False, default="../data/very_small/orders.csv", )
-    parser.add_argument("--transport", required=False, default="../data/transport_types.csv", )
-    parser.add_argument("--model", default="../GNN/model.pt")
+    parser.add_argument("--warehouses", default="data/large/warehouses.csv")
+    parser.add_argument("--orders", default="data/large/orders.csv")
+    parser.add_argument("--transport", default="data/transport_types.csv")
+    parser.add_argument("--couriers", default=None)
+    parser.add_argument("--model", default="GNN/model.pt")
     parser.add_argument("--out", default="predictions.json")
     parser.add_argument("--limit", type=int, default=None)
     args = parser.parse_args()
-    predict(args.warehouses, args.orders, args.transport, args.model, args.out, args.limit)
+    predict(args.warehouses, args.orders, args.transport, args.model, args.out, args.limit, args.couriers)

@@ -43,9 +43,10 @@ def main():
     parser.add_argument("--population-size", type=int, default=50)
     parser.add_argument("--run-id")
     parser.add_argument("--algorithm")
+    parser.add_argument("--data-dir", default="data/small")
     args = parser.parse_args()
 
-    data_dir = Path("data")
+    data_dir = Path(args.data_dir)
 
     if args.target == "experiment":
         if not args.algorithms:
@@ -92,10 +93,14 @@ def main():
 
     print("Loading comprehensive datasets...")
 
-    tasks_orders     = load_all_orders('data/small/orders.csv')
-    tasks_warehouses = load_all_warehouses('data/small/warehouses.csv')
-    speeds, max_payloads, fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee \
-        = load_transport_constraints('data/transport_types.csv')
+    tasks_orders = load_all_orders(str(data_dir / "orders.csv"))
+    tasks_warehouses = load_all_warehouses(str(data_dir / "warehouses.csv"))
+    transport_path = data_dir / "transport_types.csv"
+    if not transport_path.exists():
+        transport_path = data_dir.parent / "transport_types.csv"
+    speeds, max_payloads, fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee = load_transport_constraints(
+        str(transport_path)
+    )
 
     fee_table = _build_fee_table(fixed_fee, per_km_fee, per_order_fee, per_kg_min_fee)
 
@@ -112,9 +117,10 @@ def main():
 
 
     # Собираем fitness_fn один раз — он одинаковый для всех task_id
+    resolved_fitness_config = resolve_fitness_config(args.fitness_version)
     fitness_fn = build_fitness_fn(
         mode=args.fitness_function,
-        fitness_config=resolve_fitness_config(args.fitness_version),
+        fitness_config=resolved_fitness_config,
     )
 
     # 2. Iterate through every isolated polygon (task)
@@ -145,7 +151,7 @@ def main():
                 warehouses_dict=isolated_warehouses,
                 constraints=constraints,
                 population_size=args.population_size,
-                fitness_fn=fitness_fn,  # <-- было fitness_config=resolve_fitness_config(...)
+                fitness_config=resolved_fitness_config,
             )
         else:
             valid_individuals = run_evolutionary_clustering(
@@ -162,7 +168,7 @@ def main():
         print(f"Successfully archived {len(valid_individuals)} unique combinations.")
 
     # Сохранение результатов (без стоимостей)
-    json_path, csv_path = save_clusterizations(master_archive, "data/master_clusterizations")
+    json_path, csv_path = save_clusterizations(master_archive, str(data_dir / "master_clusterizations"))
     print(f"\nDone! Results saved to:")
     print(f"  JSON: {json_path}")
     print(f"  CSV:  {csv_path}")
