@@ -75,7 +75,6 @@ def _build_entities(dataset: dict):
                 order_id=s["order_id"],
                 location=_location_for(s["order_id"], s["stop_type"]),
                 stop_type=StopType(s["stop_type"]),
-                sequence_number=s["sequence_number"],
                 service_duration_minutes=s["service_duration_minutes"],
                 planned_arrival_time=None,  # not present in this fixture
             )

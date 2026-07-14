@@ -21,7 +21,7 @@ from simulator.tests.conftest import (
 
 
 def _route(route_id, start_loc, end_loc, start_time):
-    stop = make_stop("ORD_" + route_id, end_loc, StopType.DELIVERY, 1, arrival=start_time)
+    stop = make_stop("ORD_" + route_id, end_loc, StopType.DELIVERY, arrival=start_time)
     return make_route(route_id, "C1", start_loc, end_loc, start_time, [stop])
 
 

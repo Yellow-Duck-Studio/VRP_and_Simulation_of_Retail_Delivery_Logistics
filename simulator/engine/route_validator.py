@@ -1,28 +1,14 @@
-"""
-Trip Connection Validation for the VRP simulator.
-
-Purpose
-=======
-Routes fed into the simulator come from an external clustering, VRP solver.
-
-It performs *static* (pre-simulation) validation of Route objects against:
-  - the distance matrix (are hops backed by real data, or silent haversine
-    fallbacks that under/over-estimate real road distance?)
-  - route sequence integrity (gaps, duplicates)
-  - declared route totals vs. actually computed geometry
-  - statistical outliers in hop distance within a route
-  - continuity between consecutive routes assigned to the same courier
-"""
+""" Trip Connection Validation for the VRP simulator. """
 
 from __future__ import annotations
 
 from datetime import datetime
 from math import radians, sin, cos, sqrt, atan2
-from statistics import mean, pstdev
+from statistics import mean
 from typing import Dict, List, Optional, Tuple
 from simulator.config.validator import ValidationConfig, ValidationReport, ValidationIssue, ValidationSeverity, ValidationIssueType
 
-from ..schemas import Route, RouteStop, StopType, Location
+from ..schemas import Route, RouteStop, Location
 from .state_manager import StateManager
 from .location_resolver import LocationResolver
 
@@ -80,16 +66,25 @@ class TripConnectionValidator:
                 route.route_id, f"Courier {courier.courier_id} has unknown courier_type "
                                  f"{courier.courier_type_id}; cannot check speed feasibility",
             ))
-            courier_type = None
 
-        stops = route.stops
-        # issues.extend(self._check_sequence_integrity(route, stops))
-        issues.extend(self._check_duplicate_stops(route, stops))
+        # Check for duplicate stops (same order_id + stop_type appearing more than once)
+        # Pickup and delivery for the same order are valid (different stop_types)
+        seen_stops = set()
+        for idx, stop in enumerate(route.stops):
+            stop_key = (stop.order_id, stop.stop_type)
+            if stop_key in seen_stops:
+                issues.append(ValidationIssue(
+                    ValidationSeverity.ERROR, ValidationIssueType.DUPLICATE_STOP,
+                    route.route_id, f"Duplicate {stop.stop_type.value} stop for order {stop.order_id} "
+                                     f"(duplicate at index {idx})",
+                    {"order_id": stop.order_id, "stop_type": stop.stop_type.value, "duplicate_index": idx},
+                ))
+            seen_stops.add(stop_key)
 
         # Build full node chain: declared start -> stops... -> declared end
         chain: List[Tuple[Location, Optional[RouteStop], Optional[datetime]]] = [
             (route.start_location, None, route.start_time)]
-        for stop in stops:
+        for stop in route.stops:
             chain.append((stop.location, stop, stop.planned_arrival_time))
         chain.append((route.end_location, None, None))
 
@@ -119,79 +114,7 @@ class TripConnectionValidator:
                     {"hop_index": idx, "haversine_km": round(distance_km, 3)},
                 ))
 
-        issues.extend(self._check_outliers(route, hop_distances))
-
         return issues, hop_distances
-
-    # @staticmethod
-    # def _check_sequence_integrity(route: Route, stops: List[RouteStop]) -> List[ValidationIssue]:
-    #     issues = []
-    #     seen = set()
-    #     for stop in stops:
-    #         if stop.sequence_number in seen:
-    #             issues.append(ValidationIssue(
-    #                 ValidationSeverity.ERROR, ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE,
-    #                 route.route_id, f"Duplicate sequence_number {stop.sequence_number} "
-    #                                  f"in route {route.route_id}",
-    #                 {"sequence_number": stop.sequence_number},
-    #             ))
-    #         seen.add(stop.sequence_number)
-    #
-    #     expected = list(range(1, len(stops) + 1))
-    #     actual = sorted(seen)
-    #     if actual != expected:
-    #         issues.append(ValidationIssue(
-    #             ValidationSeverity.WARNING, ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE,
-    #             route.route_id,
-    #             f"Route {route.route_id} sequence numbers {actual} are not a contiguous "
-    #             f"1..{len(stops)} run - possible gap from removed/unassigned stops",
-    #             {"expected": expected, "actual": actual},
-    #         ))
-    #     return issues
-
-    @staticmethod
-    def _check_duplicate_stops(route: Route, stops: List[RouteStop]) -> List[ValidationIssue]:
-        issues = []
-        seen = set()
-        for stop in stops:
-            key = (stop.order_id, stop.stop_type)
-            if key in seen:
-                issues.append(ValidationIssue(
-                    ValidationSeverity.ERROR, ValidationIssueType.DUPLICATE_STOP,
-                    route.route_id,
-                    f"Order {stop.order_id} has duplicate {stop.stop_type} stops in "
-                    f"route {route.route_id}",
-                    {"order_id": stop.order_id, "stop_type": stop.stop_type},
-                ))
-            seen.add(key)
-
-            if stop.stop_type == StopType.DELIVERY and (stop.order_id, StopType.PICKUP) not in seen:
-                # Pickup either happens later (data error) or in a different route entirely,
-                # which we can't confirm here - surface as info, not a hard failure.
-                pass
-        return issues
-
-    def _check_outliers(self, route: Route, hop_distances: List[float]) -> List[ValidationIssue]:
-        issues = []
-        if len(hop_distances) < self.config.min_hops_for_outlier_check:
-            return issues
-        mu = mean(hop_distances)
-        sigma = pstdev(hop_distances)
-        if sigma == 0:
-            return issues
-        threshold = mu + self.config.outlier_std_multiplier * sigma
-        for idx, d in enumerate(hop_distances):
-            if d > threshold:
-                issues.append(ValidationIssue(
-                    ValidationSeverity.WARNING, ValidationIssueType.OUTLIER_HOP_DISTANCE,
-                    route.route_id,
-                    f"Hop {idx} distance {d:.2f} km is a statistical outlier for this route "
-                    f"(mean={mu:.2f}, std={sigma:.2f}, threshold={threshold:.2f}) - possible "
-                    f"clustering error assigning a distant order to this route",
-                    {"hop_index": idx, "distance_km": round(d, 3), "mean_km": round(mu, 3),
-                     "std_km": round(sigma, 3)},
-                ))
-        return issues
 
     def _validate_courier_continuity(self, routes: List[Route]) -> List[ValidationIssue]:
         """Checks that consecutive routes assigned to the same courier connect in space."""

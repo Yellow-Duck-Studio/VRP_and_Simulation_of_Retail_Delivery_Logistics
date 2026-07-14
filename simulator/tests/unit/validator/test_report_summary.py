@@ -20,7 +20,7 @@ from simulator.tests.conftest import (
 def _clean_route(route_id, fake_resolver, matrix, courier_id="C1"):
     """A route with no issues at all: locations are registered with the
     fake resolver/matrix (so no MISSING_DISTANCE_ENTRY fallback happens),
-    speed/time windows are generous, sequence numbers are contiguous, and
+    speed/time windows are generous, and
     there is exactly one pickup-free delivery stop."""
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.001, 48.0)
@@ -29,16 +29,15 @@ def _clean_route(route_id, fake_resolver, matrix, courier_id="C1"):
     fake_resolver.register(delivery, delivery_key)
     matrix.add(wh_key, delivery_key, 0.11)
 
-    stop = make_stop("ORD_" + route_id, delivery, StopType.DELIVERY, 1, arrival=BASE_TIME + minutes(30))
+    stop = make_stop("ORD_" + route_id, delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(30))
     return make_route(route_id, courier_id, wh, delivery, BASE_TIME, [stop])
 
 
 def _broken_route(route_id, courier_id="C2"):
-    # Duplicate sequence number -> guaranteed SEQUENCE_GAP_OR_DUPLICATE error.
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.001, 48.0)
-    stop1 = make_stop("ORD_" + route_id, delivery, StopType.DELIVERY, 1, arrival=BASE_TIME)
-    stop2 = make_stop("ORD_" + route_id, delivery, StopType.DELIVERY, 1, arrival=BASE_TIME + minutes(5))
+    stop1 = make_stop("ORD_" + route_id, delivery, StopType.DELIVERY, arrival=BASE_TIME)
+    stop2 = make_stop("ORD_" + route_id, delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(5))
     return make_route(route_id, courier_id, wh, delivery, BASE_TIME, [stop1, stop2])
 
 
@@ -73,9 +72,6 @@ def test_report_with_any_error_is_invalid_and_summarised(fake_resolver):
     assert report.summary["routes_with_errors"] == 1
     assert report.summary["clean_routes"] == 1
     assert report.summary["issues_by_severity"][ValidationSeverity.ERROR.value] >= 1
-    assert (
-        report.summary["issues_by_type"][ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE.value] >= 1
-    )
 
 
 def test_issues_for_filters_by_route_id(fake_resolver):
@@ -90,7 +86,6 @@ def test_issues_for_filters_by_route_id(fake_resolver):
     r2_issues = report.issues_for("R2")
     assert len(r2_issues) >= 1
     assert all(i.route_id == "R2" for i in r2_issues)
-    assert any(i.issue_type == ValidationIssueType.SEQUENCE_GAP_OR_DUPLICATE for i in r2_issues)
 
 
 def test_summary_includes_issues_by_type(fake_resolver):
