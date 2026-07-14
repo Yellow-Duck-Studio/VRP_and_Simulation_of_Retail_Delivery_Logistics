@@ -99,24 +99,24 @@ def main():
     logger.info(f"Loading simulation data from {input_path}...")
     load_simulation_data(str(input_path), controller.state_manager)
 
-    logger.debug(f"{Colors.BLUE}-------------------------------- Warehouses --------------------------------{Colors.RESET}")
+    logger.debug(f"{Colors.BLUE}--------------------------------- Warehouses ---------------------------------{Colors.RESET}")
     for wh_id, wh in controller.state_manager.warehouses.items():
         logger.debug(f"{wh_id}: {wh.location.address or 'No address'}")
         logger.debug(f"  Location: ({wh.location.latitude:.4f}, {wh.location.longitude:.4f})")
 
-    logger.debug(f"{Colors.BLUE}------------------------------- Courier Types -------------------------------{Colors.RESET}")
+    logger.debug(f"{Colors.BLUE}-------------------------------- Courier Types -------------------------------{Colors.RESET}")
     for ct_id, ct in controller.state_manager.courier_types.items():
         logger.debug(f"{ct_id}: {ct.name}")
         logger.debug(f"  Capacity: {ct.capacity_kg} kg, Speed: {ct.speed_kmh} km/h")
 
-    logger.debug(f"{Colors.BLUE}---------------------------------- Couriers ---------------------------------{Colors.RESET}")
+    logger.debug(f"{Colors.BLUE}----------------------------------- Couriers ---------------------------------{Colors.RESET}")
     for c_id, courier in controller.state_manager.couriers.items():
         ct = controller.state_manager.courier_types.get(courier.courier_type_id)
         logger.debug(f"{c_id}: {ct.name if ct else 'Unknown'}")
         logger.debug(f"  Status: {courier.status}, Load: {courier.current_load} kg")
         logger.debug(f"  Location: ({courier.current_location.latitude:.4f}, {courier.current_location.longitude:.4f})")
 
-    logger.debug(f"{Colors.BLUE}---------------------------------- Orders ----------------------------------{Colors.RESET}")
+    logger.debug(f"{Colors.BLUE}----------------------------------- Orders -----------------------------------{Colors.RESET}")
     for o_id, order in controller.state_manager.orders.items():
         logger.debug(f"  Warehouse ID: {order.warehouse_id}")
         logger.debug(f"  Mass: {order.mass_kg} kg")
