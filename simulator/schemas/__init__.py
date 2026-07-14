@@ -1,4 +1,4 @@
-from .order import Order, OrderStatus, Location, TimeWindow
+from .order import Order, OrderStatus, Location
 from .warehouse import Warehouse
 from .courier import Courier, CourierStatus, AffiliationType
 from .courier_type import CourierType
@@ -9,7 +9,6 @@ __all__ = [
     "Order",
     "OrderStatus", 
     "Location",
-    "TimeWindow",
     "Warehouse",
     "Courier",
     "CourierStatus",

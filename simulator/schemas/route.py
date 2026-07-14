@@ -14,7 +14,6 @@ class RouteStop(BaseModel):
     order_id: str
     location: Location
     stop_type: StopType
-    sequence_number: int = Field(..., ge=1)
     service_duration_minutes: float = Field(default=5, ge=0)
     # Computed by simulator during execution, not provided in input
     planned_arrival_time: Optional[datetime] = None

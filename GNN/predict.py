@@ -23,6 +23,7 @@ import time
 import torch
 
 from config import DEVICE
+from config import DEFAULT_MAX_COURIERS
 from io_utils import load_instances, load_transport_types
 from data import build_graph, normalize_edge_mass
 from model import ClusteringGNN
@@ -54,7 +55,7 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None
         if len(inst.orders) < 2:
             pred_clusters = [[oid] for oid in orders_by_id]
         else:
-            graph = build_graph(inst)
+            graph = build_graph(inst, default_max_couriers=DEFAULT_MAX_COURIERS)
             graph.edge_attr = normalize_edge_mass(graph.edge_attr, min_capacity_kg)
             graph = graph.to(device)
 
@@ -118,8 +119,8 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_path=None
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--warehouses", required=False, default="../data/large/warehouses.csv", )
-    parser.add_argument("--orders", required=False, default="../data/large/orders.csv", )
+    parser.add_argument("--warehouses", required=False, default="../data/very_small/warehouses.csv", )
+    parser.add_argument("--orders", required=False, default="../data/very_small/orders.csv", )
     parser.add_argument("--transport", required=False, default="../data/transport_types.csv", )
     parser.add_argument("--model", default="../GNN/model.pt")
     parser.add_argument("--out", default="predictions.json")

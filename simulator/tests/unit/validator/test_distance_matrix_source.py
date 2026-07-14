@@ -33,7 +33,7 @@ def test_hop_backed_by_matrix_entry_raises_no_missing_distance_issue(fake_resolv
 
     matrix = FakeDistanceMatrix().add("WH", "ORD1", 3.0)
 
-    stop = make_stop("ORD1", delivery, StopType.DELIVERY, 1, arrival=BASE_TIME + minutes(20))
+    stop = make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(20))
     route = make_route("R1", "C1", wh, delivery, BASE_TIME, [stop])
 
     validator = build_validator(
@@ -48,7 +48,7 @@ def test_missing_matrix_entry_is_an_error_by_default(fake_resolver):
     delivery = make_location(55.05, 48.05)
     # Neither location is registered in the fake resolver's key map, and the
     # matrix is empty -> guaranteed miss -> haversine fallback.
-    stop = make_stop("ORD1", delivery, StopType.DELIVERY, 1, arrival=BASE_TIME + minutes(60))
+    stop = make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(60))
     route = make_route("R2", "C1", wh, delivery, BASE_TIME, [stop])
 
     validator = build_validator(
@@ -64,7 +64,7 @@ def test_missing_matrix_entry_is_an_error_by_default(fake_resolver):
 def test_missing_matrix_entry_is_only_a_warning_when_not_required(fake_resolver):
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.05, 48.05)
-    stop = make_stop("ORD1", delivery, StopType.DELIVERY, 1, arrival=BASE_TIME + minutes(60))
+    stop = make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(60))
     route = make_route("R3", "C1", wh, delivery, BASE_TIME, [stop])
 
     config = ValidationConfig(require_distance_matrix_entry=False)
@@ -84,8 +84,8 @@ def test_same_physical_point_hop_is_trivial_and_never_flagged(fake_resolver):
     # entry could ever exist for "point to itself".
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.05, 48.05)
-    pickup_stop = make_stop("ORD1", wh, StopType.PICKUP, 1, arrival=BASE_TIME + minutes(5))
-    delivery_stop = make_stop("ORD1", delivery, StopType.DELIVERY, 2, arrival=BASE_TIME + minutes(60))
+    pickup_stop = make_stop("ORD1", wh, StopType.PICKUP, arrival=BASE_TIME + minutes(5))
+    delivery_stop = make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(60))
     route = make_route(
         "R4", "C1", wh, delivery, BASE_TIME, [pickup_stop, delivery_stop],
     )

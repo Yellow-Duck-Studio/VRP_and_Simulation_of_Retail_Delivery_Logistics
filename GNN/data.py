@@ -8,7 +8,7 @@ from geo import haversine_km
 from io_utils import WarehouseInstance
 
 
-def build_graph(inst: WarehouseInstance) -> Data:
+def build_graph(inst: WarehouseInstance, default_max_couriers: int) -> Data:
     orders = inst.orders
     n = len(orders)
     wlat, wlon = inst.warehouse_lat, inst.warehouse_lon
@@ -16,6 +16,14 @@ def build_graph(inst: WarehouseInstance) -> Data:
     masses = [o["mass_kg"] for o in orders]
     max_mass = max(masses) if masses else 1.0
     min_pickup = min(o["pickup_ready_at"] for o in orders)
+
+    # Глобальный (не per-order) параметр -- одно и то же значение
+    # дублируется в каждую ноду, чтобы не менять архитектуру модели
+    # отдельным "global feature" входом. Источник: inst.max_couriers, если
+    # он известен (сгенерирован обновлённым brute_force_ilp.py), иначе
+    # fallback на default_max_couriers (например, для старых данных без
+    # этого поля).
+    max_couriers = inst.max_couriers if inst.max_couriers is not None else default_max_couriers
 
     node_feats = []
     for o in orders:
@@ -31,6 +39,7 @@ def build_graph(inst: WarehouseInstance) -> Data:
                 time_window_min,
                 pickup_offset_min,
                 deadline_offset_min,
+                float(max_couriers),
             ]
         )
     x = torch.tensor(node_feats, dtype=torch.float)
@@ -89,14 +98,15 @@ def normalize_edge_mass(edge_attr, min_capacity_kg: float):
 
 
 class WarehouseGraphDataset(torch.utils.data.Dataset):
-    def __init__(self, instances, min_capacity_kg: float):
+    def __init__(self, instances, min_capacity_kg: float, default_max_couriers: int):
         self.instances = [inst for inst in instances if len(inst.orders) >= 2]
         self.min_capacity_kg = min_capacity_kg
+        self.default_max_couriers = default_max_couriers
 
     def __len__(self):
         return len(self.instances)
 
     def __getitem__(self, idx):
-        data = build_graph(self.instances[idx])
+        data = build_graph(self.instances[idx], self.default_max_couriers)
         data.edge_attr = normalize_edge_mass(data.edge_attr, self.min_capacity_kg)
         return data

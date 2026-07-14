@@ -21,6 +21,7 @@ the checker's route_stats()).
     выехать, пока не готовы все заказы кластера.
 """
 
+import heapq
 import itertools
 from typing import Dict, List, Optional
 
@@ -74,19 +75,29 @@ def best_route_for_transport(
         if not feasible:
             continue
 
-        total_time_min = (cur_time - start_time).total_seconds() / 60.0
+        # Обратное плечо: последняя точка доставки -> склад. Курьер физически
+        # обязан вернуться, машина едет пустой (в kg_min ничего не добавляем,
+        # remaining_mass к этому моменту == 0), но расстояние и время реальны.
+        return_dist = haversine_km(cur_lat, cur_lon, warehouse_lat, warehouse_lon)
+        total_dist += return_dist
+        return_min = return_dist / tariff.approx_speed_kmh * 60.0
+        finish_time = cur_time + pd.Timedelta(minutes=return_min)
+
+        total_time_min = (finish_time - start_time).total_seconds() / 60.0
 
         cost = (
                 tariff.fixed_fee
-                + tariff.per_km_fee * total_dist
+                + tariff.per_km_fee * total_dist          # уже включает return_dist
                 + tariff.per_order_fee * n
-                + tariff.per_kg_min_fee * kg_min
+                + tariff.per_kg_min_fee * kg_min           # без изменений — на обратном плече remaining_mass=0
         )
         if best is None or cost < best["cost"]:
             best = {
                 "cost": cost,
                 "distance_km": total_dist,
                 "duration_min": total_time_min,
+                "start_at": start_time,        # момент выезда со склада
+                "finish_at": finish_time,       # момент возврата на склад (курьер снова свободен)
                 "order_sequence": [orders[i]["order_id"] for i in perm],
                 "transport": tariff.code,
             }
@@ -131,3 +142,25 @@ def clustering_total_cost(
     if seen != set(orders_by_id.keys()):
         return None
     return total
+
+
+def required_couriers(cluster_solutions: List[dict]) -> int:
+    """
+    Минимальное число курьеров, необходимое чтобы выполнить набор рейсов
+    (каждый — dict с ключами start_at/finish_at из best_cluster_solution),
+    с учётом того, что один курьер может взять следующий рейс, если он
+    освобождается не позже, чем начинается следующий. Классический sweep
+    line с min-heap по времени освобождения.
+
+    Используется в decode.py::enforce_courier_capacity и может
+    использоваться в infer.py для диагностики (сколько курьеров реально
+    требует предсказание модели).
+    """
+    ordered = sorted(cluster_solutions, key=lambda s: s["start_at"])
+    heap = []
+    for s in ordered:
+        if heap and heap[0] <= s["start_at"]:
+            heapq.heapreplace(heap, s["finish_at"])
+        else:
+            heapq.heappush(heap, s["finish_at"])
+    return len(heap)

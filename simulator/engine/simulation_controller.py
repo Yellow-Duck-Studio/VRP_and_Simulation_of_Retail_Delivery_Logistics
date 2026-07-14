@@ -53,7 +53,7 @@ class SimulationController:
         if not self.validation_report.is_valid:
             error_issues = [i for i in self.validation_report.issues
                              if i.severity.value == "error"]
-            self.logger.error(f"{self.time_manager.current_time} Route validation found "
+            self.logger.info(f"{self.time_manager.current_time} Route validation found "
                   f"{len(error_issues)} ERROR-level issue(s) across "
                   f"{self.validation_report.summary.get('routes_with_errors', 0)} route(s)")
             for issue in error_issues[:20]:
@@ -64,7 +64,7 @@ class SimulationController:
         warnings = [i for i in self.validation_report.issues
                     if i.severity.value == "warning"]
         if warnings:
-            self.logger.warning(f"{self.time_manager.current_time} Route validation found "
+            self.logger.info(f"{self.time_manager.current_time} Route validation found "
                   f"{len(warnings)} WARNING-level issue(s)")
             for issue in warnings[:20]:
                 self.logger.warning(f"{self.time_manager.current_time}  - [{issue.route_id}] {issue.issue_type.value}: {issue.message}")
@@ -75,8 +75,8 @@ class SimulationController:
 
     def initialize(self) -> None:
         current_time = self.time_manager.current_time
-        self.logger.info(f"{current_time} Simulation initialization")
-        self.logger.info(f"{current_time} Entities: {len(self.state_manager.orders)} orders, "
+        self.logger.debug(f"{current_time} Simulation initialization")
+        self.logger.debug(f"{current_time} Entities: {len(self.state_manager.orders)} orders, "
                          f"{len(self.state_manager.couriers)} couriers, "
                          f"{len(self.state_manager.routes)} routes")
 
@@ -121,7 +121,7 @@ class SimulationController:
         """Execute one simulation step."""
         current_time = self.time_manager.advance()
         if self.max_steps and self.time_manager.total_steps >= self.max_steps:
-            self.logger.info(f"{current_time} Max steps ({self.max_steps}) reached, stopping")
+            self.logger.debug(f"{current_time} Max steps ({self.max_steps}) reached, stopping")
             return False
 
         self.logger.debug(f"{current_time} Step {self.time_manager.total_steps} details...")
@@ -147,7 +147,7 @@ class SimulationController:
 
     def run(self, max_steps: Optional[int] = None) -> None:
         current_time = self.time_manager.advance()
-        self.logger.info(f"{current_time} Starting simulation run")
+        self.logger.debug(f"{current_time} Starting simulation run")
         self.max_steps = max_steps
         self.is_running = True
         self.initialize()
@@ -163,7 +163,7 @@ class SimulationController:
             "simulator"
         ))
         current_time = self.time_manager.advance()
-        self.logger.info(f"{current_time} Simulation finished")
+        self.logger.debug(f"{current_time} Simulation finished")
 
     def stop(self) -> None:
         self.is_running = False

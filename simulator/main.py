@@ -120,7 +120,7 @@ def main():
     for o_id, order in controller.state_manager.orders.items():
         logger.debug(f"  Warehouse ID: {order.warehouse_id}")
         logger.debug(f"  Mass: {order.mass_kg} kg")
-        logger.debug(f"  Time Window: {order.delivery_time_window.start.strftime('%H:%M')} - {order.delivery_time_window.end.strftime('%H:%M')}")
+        logger.debug(f"  Delivery Window End: {order.delivery_time_window_end.strftime('%H:%M')}")
         logger.debug(f"  Ready Time: {order.ready_time.strftime('%H:%M')}")
         logger.debug(f"  Status: {order.status}")
 
@@ -133,10 +133,10 @@ def main():
         else:
             logger.info(f"{key}: {value}")
 
-    logger.info(f"{Colors.BLUE}----------------------------- Running Simulation -----------------------------{Colors.RESET}")
-    logger.info(f"Start Time: {start_time.isoformat()}")
-    logger.info(f"Time Step: {args.time_step} minutes")
-    logger.info(f"Max Steps: {args.max_steps}")
+    logger.debug(f"{Colors.BLUE}----------------------------- Running Simulation -----------------------------{Colors.RESET}")
+    logger.debug(f"Start Time: {start_time.isoformat()}")
+    logger.debug(f"Time Step: {args.time_step} minutes")
+    logger.debug(f"Max Steps: {args.max_steps}")
 
     controller.run(max_steps=args.max_steps)
 

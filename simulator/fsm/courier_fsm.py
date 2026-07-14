@@ -40,7 +40,7 @@ class CourierFSM:
         self.route_start_time = current_time
         self.courier.status = CourierStatus.DELIVERING
         self.courier.current_route_id = next_route_id
-        self.logger.info(f"{current_time} Starting route {next_route_id} with {len(route.stops)} stops")
+        self.logger.debug(f"{current_time} Starting route {next_route_id} with {len(route.stops)} stops")
 
         start_loc = self.courier.current_location or route.stops[0].location
         first_stop = route.stops[0]
@@ -123,7 +123,7 @@ class CourierFSM:
                     self.move_to_next_stop(current_time)
                     return
 
-                self.logger.info(f"{current_time} Pickup order {order.order_id}")
+                self.logger.debug(f"{current_time} Pickup order {order.order_id}")
                 order_fsm.assign_to_courier(self.courier.courier_id, current_time)
                 order_fsm.pickup(current_time)
                 self.courier.current_load += order.mass_kg
@@ -138,15 +138,9 @@ class CourierFSM:
                 )
                 self.move_to_next_stop(current_time)
                 return
-            if current_time < order.delivery_time_window.start:
-                wait_seconds = (order.delivery_time_window.start - current_time).total_seconds()
-                self.logger.debug(f"{current_time} Order {order.order_id} delivery window not open, waiting {wait_seconds:.1f}s")
-                self.progress["arrival_time"] = current_time + timedelta(seconds=wait_seconds)
-                return
 
-            # Deliver
-            self.logger.info(f"{current_time} Delivering order {order.order_id}")
-            in_window = order.delivery_time_window.start <= current_time <= order.delivery_time_window.end
+            self.logger.debug(f"{current_time} Delivering order {order.order_id}")
+            in_window = current_time <= order.delivery_time_window_end
             order_fsm.deliver(current_time, in_window)
 
             self.state_manager.delivery_results[order.order_id] = {
@@ -162,7 +156,7 @@ class CourierFSM:
             self.courier.current_location = stop.location
             self.move_to_next_stop(current_time, service_time=stop.service_duration_minutes)
 
-    def move_to_next_stop(self, current_time: datetime, service_time: int = 0) -> None:
+    def move_to_next_stop(self, current_time: datetime, service_time: float = 0) -> None:
         """Plan next stop after service."""
         route = self.state_manager.routes.get(self.progress["current_route_id"])
         if not route:
@@ -193,7 +187,7 @@ class CourierFSM:
         ))
 
     def finish_route(self, current_time: datetime) -> None:
-        self.logger.info(f"{current_time} Finishing route {self.courier.current_route_id}")
+        self.logger.debug(f"{current_time} Finishing route {self.courier.current_route_id}")
         self.progress = None
         self.courier.current_route_id = None
         if self.route_start_time:
@@ -204,7 +198,7 @@ class CourierFSM:
 
         if not self.start_next_route(current_time):
             self.courier.status = CourierStatus.IDLE
-            self.logger.info(f"{current_time} Courier {self.courier.courier_id} is now idle")
+            self.logger.debug(f"{current_time} Courier {self.courier.courier_id} is now idle")
             self.event_manager.publish(Event(
                 EventType.COURIER_RETURNED,
                 current_time,
