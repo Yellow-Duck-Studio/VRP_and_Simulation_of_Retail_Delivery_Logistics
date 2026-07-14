@@ -81,12 +81,15 @@ const getVariantsFromAlgoData = (algoData: AlgorithmResults, taskKey: string): C
 
     if (allFound.length === 0) return [];
 
+    let clusterId = 0;
     const mergedClusters = allFound.flatMap((item: GnnTaskResult) =>
       item.clusters.map((c: GnnClusterData) => {
         const sequence = c.order_sequence || c.order_ids || [];
+        const orderIds = sequence.map((id: string | number) => Number(id));
 
         return {
-          order_ids: sequence.map((id: string | number) => Number(id)),
+          cluster_id: ++clusterId,
+          order_ids: orderIds,
           transport_type: c.transport || "unknown",
           warehouse_id: Number(item.warehouse_id)
         };
@@ -98,7 +101,7 @@ const getVariantsFromAlgoData = (algoData: AlgorithmResults, taskKey: string): C
     , 0);
 
     const isValid = allFound.every(item =>
-      item.clusters.every((c: GnnClusterData) => c.feasible !== false)
+      item.clusters.every((c: GnnClusterData) => c.feasible)
     );
 
     return [
@@ -276,7 +279,7 @@ export default function ClusterizationModule() {
                 </svg>
               </button>
 
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 w-max max-w-[300px] whitespace-normal shadow-lg">
+              <span className="absolute bottom-full left-20/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-gray-800 text-white text-xs rounded py-1 px-2 w-max max-w-[300px] whitespace-normal shadow-lg">
                 Algorithms below are used to initiate initial population for evolutionary algorithm. Does not support dataset choosing.
               </span>
             </div>

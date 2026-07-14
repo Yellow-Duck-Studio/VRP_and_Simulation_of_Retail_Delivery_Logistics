@@ -14,7 +14,11 @@ interface Metrics {
 }
 
 function extractMetrics(text: string): Metrics {
-  const cleanText = text.replace(/(?:\\x1b|\\u001b|\\033)\[\d+m/g, "");
+  const cleanText = text
+    .replace(/\x1b\[[\d;]*m/g, "")
+    .replace(/\\x1b\[[\d;]*m/g, "")
+    .replace(/\\u001b\[[\d;]*m/g, "")
+    .replace(/\\033\[[\d;]*m/g, "");
 
   const num = (re: RegExp) => {
     const m = cleanText.match(re);
@@ -26,12 +30,12 @@ function extractMetrics(text: string): Metrics {
   };
 
   return {
-    totalOrders: num(/total_orders:\s*(\d+)/),
-    deliveredOrders: num(/delivered_orders:\s*(\d+)/),
-    slaHitRate: num(/sla_hit_rate:\s*([\d.]+)%/),
-    totalCost: raw(/Total delivery cost:\s*([\d.]+)/),
-    routesWithErrors: num(/routes_with_errors:\s*(\d+)/),
-    routesWithWarnings: num(/routes_with_warnings:\s*(\d+)/),
+    totalOrders: num(/Total Orders:\s*(\d+)/i),
+    deliveredOrders: num(/Delivered Orders:\s*(\d+)/i),
+    slaHitRate: num(/SLA Hit Rate:\s*([\d.]+)%/i),
+    totalCost: raw(/Total Delivery Cost:\s*([\d.]+)/i),
+    routesWithErrors: num(/Routes With Errors:\s*(\d+)/i),
+    routesWithWarnings: num(/Routes With Warnings:\s*(\d+)/i),
   };
 }
 
@@ -61,10 +65,11 @@ function StatusBadge({ status }: { status: RunStatus }) {
   );
 }
 
-function MetricCard({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "good" | "bad" }) {
+function MetricCard({ label, value, tone = "neutral" }: { label: string; value: string; tone?: "neutral" | "good" | "alert" | "bad" }) {
   const toneClasses = {
     neutral: "border-gray-200 text-gray-800",
     good: "border-green-200 text-green-700 bg-green-50",
+    alert: "border-yellow-200 text-yellow-700 bg-yellow-50",
     bad: "border-red-200 text-red-700 bg-red-50",
   }[tone];
   return (
@@ -123,6 +128,13 @@ export default function SimulationModule() {
   }, [config]);
 
   const formatOutput = (text: string) => {
+    const stripAnsi = (str: string) =>
+      str
+        .replace(/\x1b\[[\d;]*m/g, "")
+        .replace(/\\x1b\[[\d;]*m/g, "")
+        .replace(/\\u001b\[[\d;]*m/g, "")
+        .replace(/\\033\[[\d;]*m/g, "");
+
     const lines = text.split("\n");
     let html = "";
 
@@ -132,56 +144,28 @@ export default function SimulationModule() {
         continue;
       }
 
-      let content = line;
+      let content = stripAnsi(line);
       let prefix = "";
 
-      const tsMatch = line.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*(.*)/);
+      const tsMatch = content.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\s*(.*)/);
       if (tsMatch) {
         prefix = `<span style="color:#9ca3af;margin-right:0.5rem;">${tsMatch[1]}</span>`;
         content = tsMatch[2];
       }
 
-      let activeStyles = 0;
-      let contentHtml = "";
+      content = content
+        .replace(/\[DEBUG]/g, '<span style="color:#9ca3af;font-weight:600;">[DEBUG]</span>')
+        .replace(/\[INFO]/g, '<span style="color:#16a34a;font-weight:600;">[INFO]</span>')
+        .replace(/\[WARNING]/g, '<span style="color:#ca8a04;font-weight:600;">[WARNING]</span>')
+        .replace(/\[ERROR]/g, '<span style="color:#dc2626;font-weight:600;">[ERROR]</span>')
+        .replace(/\[CRITICAL]/g, '<span style="color:#dc2626;font-weight:700;">[CRITICAL]</span>');
 
-      const parts = content.split(/(?:\\x1b|\\u001b|\\033)\[(\d+)m/);
+      content = content.replace(
+        /-{3,}\s*(.+?)\s*-{3,}/g,
+        (match) => `<span style="color:#2563eb;font-weight:700;">${match}</span>`
+      );
 
-      for (let i = 0; i < parts.length; i++) {
-        if (i % 2 === 0) {
-          contentHtml += parts[i].replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        } else {
-          const code = parts[i];
-          if (code === "0") {
-            contentHtml += "</span>".repeat(activeStyles);
-            activeStyles = 0;
-          } else {
-            let style = "";
-            switch (code) {
-              case "94": style = "color: #3b82f6;"; break;
-              case "92": style = "color: #16a34a;"; break;
-              case "93": style = "color: #eab308;"; break;
-              case "91": style = "color: #ef4444;"; break;
-              case "1":  style = "font-weight: 700;"; break;
-              case "2":  style = "color: #9ca3af;"; break;
-            }
-
-            if (style) {
-              contentHtml += `<span style="${style}">`;
-              activeStyles++;
-            }
-          }
-        }
-      }
-
-      contentHtml += "</span>".repeat(activeStyles);
-
-      contentHtml = contentHtml.replace(/\[DEBUG\]/g, '<span style="color:#9ca3af;font-weight:600;">[DEBUG]</span>');
-      contentHtml = contentHtml.replace(/\[INFO\]/g, '<span style="color:#16a34a;font-weight:600;">[INFO]</span>');
-      contentHtml = contentHtml.replace(/\[WARNING\]/g, '<span style="color:#ca8a04;font-weight:600;">[WARNING]</span>');
-      contentHtml = contentHtml.replace(/\[ERROR\]/g, '<span style="color:#dc2626;font-weight:600;">[ERROR]</span>');
-      contentHtml = contentHtml.replace(/\[CRITICAL\]/g, '<span style="color:#dc2626;font-weight:700;">[CRITICAL]</span>');
-
-      html += `<div style="font-family:monospace;font-size:0.875rem;white-space:pre-wrap;">${prefix}${contentHtml}</div>`;
+      html += `<div style="font-family:monospace;font-size:0.875rem;white-space:pre-wrap;">${prefix}${content}</div>`;
     }
 
     return html;
@@ -282,7 +266,11 @@ export default function SimulationModule() {
 
       {status === "success" && metrics && (
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
-          <MetricCard label="Delivered" value={`${metrics.deliveredOrders ?? "–"}/${metrics.totalOrders ?? "–"}`} />
+          <MetricCard
+            label="Delivered"
+            value={`${metrics.deliveredOrders ?? "–"}/${metrics.totalOrders ?? "–"}`}
+            tone={((metrics.deliveredOrders ?? "–") == (metrics.totalOrders ?? "–")) ? "good" : "bad"}
+          />
           <MetricCard
             label="SLA hit rate"
             value={metrics.slaHitRate !== undefined ? `${metrics.slaHitRate.toFixed(0)}%` : "–"}
@@ -297,7 +285,7 @@ export default function SimulationModule() {
           <MetricCard
             label="Route warnings"
             value={`${metrics.routesWithWarnings ?? 0}`}
-            tone={metrics.routesWithWarnings ? "bad" : "good"}
+            tone={metrics.routesWithWarnings ? "alert" : "good"}
           />
         </div>
       )}
