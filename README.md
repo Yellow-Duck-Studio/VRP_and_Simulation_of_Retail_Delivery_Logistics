@@ -2,19 +2,28 @@
 
 ![CI Status](https://github.com/Yellow-Duck-Studio/VRP_and_Simulation_of_Retail_Delivery_Logistics/actions/workflows/simulator_tests.yml/badge.svg)
 ![Python Version](https://img.shields.io/badge/python-3.12-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 <div align="center">
   <img src="assets/logo.png" alt="Project Logo" width="200"/>
 </div>
 
 ## About the Project
-Managing retail delivery logistics involves complex mathematical routing and precise cost calculations. Current systems often struggle with inefficient route validation, leading to financial losses in courier payouts. 
+Managing retail delivery logistics involves complex mathematical routing and precise cost calculations. Current systems often struggle with inefficient route validation, leading to financial losses in courier payouts.
 
 Built for the Industrial track, this project addresses this gap by providing an automated VRP (Vehicle Routing Problem) simulator. Our solution evaluates delivery efficiency against a baseline using advanced algorithms to provide actionable financial and logistical analytics.
 
 The system is divided into two core components:
-1. **Clustering Module:** Automates the optimal grouping of delivery orders using DBSCAN and Evolutionary algorithms.
-2. **Simulation Module:** Validates VRP solutions and precisely calculates courier compensation based on simulated outcomes.
+1. **Clustering Module:** Automates the optimal grouping of delivery orders using DBSCAN, Clarke-Wright, Sweep, Destroy & Repair, and Graph Neural Networks (GNN).
+2. **Simulation Module:** Validates VRP solutions and precisely calculates courier compensation based on simulated outcomes with strict SLA monitoring.
+
+### Key Features
+- **Multiple Clustering Algorithms:** DBSCAN, Clarke-Wright, Sweep, Destroy & Repair, Random, and GNN-based optimization
+- **Advanced Cost Calculation:** Return leg tracking, dynamic cargo cost (kg × min model), and fleet capacity limits
+- **Strict SLA Monitoring:** Delivery deadline validation with comprehensive error handling
+- **Real-time Dashboard:** Interactive React-based frontend for visualization and analysis
+- **Containerized Deployment:** Full Docker Compose setup for easy deployment
+- **Comprehensive Testing:** Unit and integration tests for both backend and frontend
 
 ## Dashboard Preview
 
@@ -74,12 +83,30 @@ docker compose down
 * Integration with external customer services.
 
 ## Technical Stack
-* **Python:** Core backend language for rapid prototyping and robust logic.
-* **NumPy:** C++ backed processing for high-speed mathematical array operations crucial to VRP calculations.
-* **scikit-learn:** Reliable pre-built algorithms (DBSCAN) and mathematical metrics.
-* **Pandas:** Efficient manipulation and parsing of initial raw datasets.
-* **Pydantic:** Strict object creation and data validation within the simulation module.
-* **pytest:** Primary framework for all unit and integration testing.
+
+### Backend
+- **Python 3.12:** Core backend language for rapid prototyping and robust logic
+- **NumPy:** C++ backed processing for high-speed mathematical array operations crucial to VRP calculations
+- **scikit-learn:** Reliable pre-built algorithms (DBSCAN) and mathematical metrics
+- **Pandas:** Efficient manipulation and parsing of initial raw datasets
+- **Pydantic:** Strict object creation and data validation within the simulation module
+- **pytest:** Primary framework for all unit and integration testing
+- **FastAPI:** Modern web framework for building APIs with automatic validation
+- **WebSockets:** Real-time communication for clustering progress updates
+
+### Frontend
+- **React 19:** Modern UI library for building interactive dashboards
+- **TypeScript:** Type-safe JavaScript for improved developer experience
+- **Vite:** Fast build tool and development server
+- **TailwindCSS:** Utility-first CSS framework for rapid styling
+- **Heroicons:** Beautiful SVG icon library
+- **Vitest:** Fast unit testing framework for React components
+- **Testing Library:** React testing utilities for component testing
+
+### DevOps
+- **Docker:** Containerization for consistent deployment
+- **Docker Compose:** Multi-container orchestration
+- **GitHub Actions:** CI/CD pipeline for automated testing
 
 ## Manual Installation
 
@@ -117,6 +144,12 @@ python main.py CLWR
 python main.py SWEEP
 python main.py DSTR
 python main.py RND
+```
+
+Run the Graph Neural Network (GNN) for every algorithm
+
+```bash
+python GNN/predict.py
 ```
 
 This will:
@@ -194,3 +227,141 @@ The simulation expects a JSON file with the following structure:
 ```
 
 See `simulator/input_schema.json` for the complete schema definition and `simulator/test_data_innopolis.json` for an example.
+
+## API Documentation
+
+### Clustering Endpoints
+
+#### POST /api/cluster
+Run clustering algorithms on selected dataset.
+
+**Request Body:**
+```json
+{
+  "algorithms": ["DBSCAN", "Clarke Wright"],
+  "dataset": "large",
+  "gnn_algorithm": "clarke_wright"
+}
+```
+
+**Response:**
+```json
+{
+  "DBSCAN": {
+    "task_1": [...],
+    "task_2": [...]
+  },
+  "Clarke Wright": {
+    "task_1": [...],
+    "task_2": [...]
+  }
+}
+```
+
+#### WebSocket /ws/cluster
+Real-time clustering progress updates.
+
+**Message Types:**
+- `algo_start`: Algorithm execution started
+- `log`: Progress log line
+- `algo_done`: Algorithm completed with results
+- `error`: Error occurred
+- `done`: All algorithms completed
+
+### Simulation Endpoints
+
+#### POST /api/simulate
+Run discrete event simulation.
+
+**Request Body:**
+```json
+{
+  "input": "test_data_innopolis.json",
+  "time_step": 5,
+  "max_steps": 100,
+  "strict": true
+}
+```
+
+**Response:** Simulation results JSON
+
+#### GET /api/simulate/inputs
+List available simulation input files.
+
+**Response:**
+```json
+{
+  "inputs": ["test_data_innopolis.json", "another_input.json"]
+}
+```
+
+### GNN Endpoints
+
+#### GET /api/gnn/{algorithm}
+Load pre-computed GNN algorithm results.
+
+**Available algorithms:** `greedy`, `clarke_wright`, `sweep`, `dbscan_eps_0.1`, `dbscan_eps_0.2`, etc.
+
+## Deployment
+
+### Production Deployment
+The application is deployed at: **http://10.93.27.5:80**
+
+### Docker Deployment
+```bash
+# Build and start all services
+docker compose up --build
+
+# Stop services
+docker compose down
+```
+
+### Environment Variables
+- `VITE_API_BASE_URL`: Backend API base URL (for frontend)
+- `PYTHONPATH`: Python module path
+
+## Testing
+
+### Backend Tests
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=simulator
+
+# Run specific test file
+pytest simulator/tests/unit/validator/test_report_summary.py
+```
+
+### Frontend Tests
+```bash
+cd frontend
+npm test
+
+# Run with coverage
+npm run coverage
+```
+
+## Documentation
+
+- [Pipeline Overview](PIPELINE_OVERVIEW.md) - Clustering pipeline architecture
+- [Experiments Overview](EXPERIMENTS_OVERVIEW.md) - Experiment framework guide
+- [CI/CD Pipeline](CICD_PIPELINE.md) - Continuous integration setup
+
+## Team
+
+**Yellow-Duck-Studio**
+- Ekaterina Ivanova
+- Egor Novokreshchenov
+- Daria Galushko
+- Azamat Kharisov
+- Aleksandr Kurilenko
+- Ivan Prikhodko
+- Matvei Kantserov
+- Konstantin Smirnov
+
+## Acknowledgments
+
+- Built for the Industrial track of the Innopolis University project
+- Customers: Egor Torshin, Victor Lobachev
