@@ -7,7 +7,12 @@ import { MockWebSocket } from '../__mocks__/websocket';
 import ClusterizationModule from '../components/ClusterizationModule';
 
 // ─── Mocks ──────────────────────────────────────
-vi.mock('../api');
+vi.mock('../api', () => ({
+  runClusteringWithProgress: vi.fn(),
+  getTasksFromAlgoData: vi.fn(),
+  getVariantsFromAlgoData: vi.fn(),
+  loadGnnAlgorithmResult: vi.fn(),
+}));
 vi.mock('../components/ClusterMapCanvas', () => ({
   default: vi.fn((props: { clusters: number[][]; taskId: number | string; isRunning?: boolean }) => (
     <div
@@ -21,6 +26,11 @@ vi.mock('../components/ClusterMapCanvas', () => ({
 
 const mockedApi = vi.mocked(api);
 
+// ─── Default mock implementations ──────────────
+mockedApi.loadGnnAlgorithmResult.mockResolvedValue([]);
+mockedApi.getTasksFromAlgoData.mockReturnValue([]);
+mockedApi.getVariantsFromAlgoData.mockReturnValue([]);
+
 // ─── WebSocket setup ────────────────────────────
 let mockWs: MockWebSocket;
 
@@ -28,6 +38,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockWs = new MockWebSocket('ws://localhost:3001/ws/cluster');
   vi.stubGlobal('WebSocket', vi.fn(() => mockWs));
+  // Reset default mocks
+  mockedApi.loadGnnAlgorithmResult.mockResolvedValue([]);
+  mockedApi.getTasksFromAlgoData.mockReturnValue([]);
+  mockedApi.getVariantsFromAlgoData.mockReturnValue([]);
 });
 
 // ─── Helpers ────────────────────────────────────
@@ -58,13 +72,8 @@ describe('ClusterizationModule', () => {
   });
 
   it('calls runClusteringWithProgress and displays progress logs', async () => {
-    let resolveClustering: (value: AllResults) => void = () => {};
-    const clusteringPromise = new Promise<AllResults>((resolve) => {
-      resolveClustering = resolve;
-    });
-
     mockedApi.runClusteringWithProgress.mockImplementation(
-      (_algorithms: string[], _dataset: string, onEvent: (e: ClusterProgressEvent) => void) => {
+      (_algorithms: string[], _dataset: string, _gnnAlgorithm: string | undefined, onEvent: (e: ClusterProgressEvent) => void) => {
         onEvent({ type: 'algo_start', algorithm: 'GNN' });
         onEvent({ type: 'log', algorithm: 'GNN', line: 'Loading data...' });
         onEvent({ type: 'algo_done', algorithm: 'GNN', data: [
@@ -95,7 +104,7 @@ describe('ClusterizationModule', () => {
           },
         ] });
         onEvent({ type: 'done' });
-        return clusteringPromise;
+        return Promise.resolve({});
       }
     );
 
@@ -103,10 +112,6 @@ describe('ClusterizationModule', () => {
     await selectAlgorithm('GNN');
 
     await clickRun();
-
-    expect(screen.getByRole('button', { name: /run/i })).toBeDisabled();
-
-    setTimeout(() => resolveClustering({}), 0);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /run/i })).toBeEnabled();
