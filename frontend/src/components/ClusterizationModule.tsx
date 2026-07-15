@@ -162,7 +162,7 @@ export default function ClusterizationModule() {
   const [loading, setLoading] = useState(false);
   const [activeAlgo, setActiveAlgo] = useState<string | null>(null);
   const [logsByAlgo, setLogsByAlgo] = useState<Record<string, string[]>>({});
-  const [dataset, setDataset] = useState<"small" | "large" | "big">("small");
+  const [dataset, setDataset] = useState<"small" | "large" | "big">("large");
 
   // Polygon/variant navigation state for single-map (evolutionary) panels.
   const [polygonIdx, setPolygonIdx] = useState<Record<string, number>>({});
@@ -436,7 +436,7 @@ export default function ClusterizationModule() {
                     <AlgoStatusBadge isActive={isActive} hasData={hasGnnData} />
                   </div>
 
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:divide-x xl:divide-gray-200">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 xl:divide-x xl:divide-gray-200">
                     <div className="xl:pr-6">
                       <div className="mb-3">
                         <label className="flex items-center gap-2 text-xs font-medium text-gray-500">
