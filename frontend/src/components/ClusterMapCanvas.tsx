@@ -82,6 +82,8 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
   const [hoveredPoint, setHoveredPoint] = useState<Point | null>(null);
   const [tooltipOrder, setTooltipOrder] = useState<OrderInfo | null>(null);
   const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({});
+
+  const [isPinned, setIsPinned] = useState(false);
   const [hoveredWarehouse, setHoveredWarehouse] = useState<WarehousePoint | null>(null);
   const [warehouseTooltipStyle, setWarehouseTooltipStyle] = useState<React.CSSProperties>({});
 
@@ -318,6 +320,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
   };
 
   const showTooltip = useCallback((point: Point, event: React.MouseEvent) => {
+    if (isPinned) return; // a pinned tooltip is undisturbed by hovering other points
     setHoveredPoint(point);
     setTooltipOrder(getOrder(taskId, point.id) ?? null);
 
@@ -334,15 +337,51 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
         top: `${top}px`,
         position: "absolute",
         zIndex: 10,
-        pointerEvents: "none",
+        pointerEvents: "auto",
+      });
+    }
+  }, [taskId, isPinned]);
+
+  const hideTooltip = useCallback(() => {
+    if (isPinned) return;
+    setHoveredPoint(null);
+    setTooltipOrder(null);
+  }, [isPinned]);
+
+
+  const pinTooltip = useCallback((point: Point, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setIsPinned(true);
+    setHoveredPoint(point);
+    setTooltipOrder(getOrder(taskId, point.id) ?? null);
+
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      let left = event.clientX - rect.left + 15;
+      let top = event.clientY - rect.top + 15;
+
+      if (left + 220 > rect.width) left = event.clientX - rect.left - 220;
+      if (top + 150 > rect.height) top = event.clientY - rect.top - 150;
+
+      setTooltipStyle({
+        left: `${left}px`,
+        top: `${top}px`,
+        position: "absolute",
+        zIndex: 10,
+        pointerEvents: "auto",
       });
     }
   }, [taskId]);
 
-  const hideTooltip = useCallback(() => {
+  const unpinTooltip = useCallback(() => {
+    setIsPinned(false);
     setHoveredPoint(null);
     setTooltipOrder(null);
   }, []);
+
+  const handleCanvasBackgroundClick = useCallback(() => {
+    if (isPinned) unpinTooltip();
+  }, [isPinned, unpinTooltip]);
 
   const showWarehouseTooltip = useCallback((wp: WarehousePoint, event: React.MouseEvent) => {
     setHoveredWarehouse(wp);
@@ -367,6 +406,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
   }, []);
 
   const handlePointMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isPinned) return;
     if (containerRef.current && hoveredPoint) {
       const rect = containerRef.current.getBoundingClientRect();
       let left = e.clientX - rect.left + 15;
@@ -375,7 +415,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
       if (top + 150 > rect.height) top = e.clientY - rect.top - 150;
       setTooltipStyle(prev => ({ ...prev, left: `${left}px`, top: `${top}px` }));
     }
-  }, [hoveredPoint]);
+  }, [hoveredPoint, isPinned]);
 
 
   if (!clusters || clusters.length === 0) {
@@ -588,6 +628,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
     <div
       ref={containerRef}
       className="relative w-full overflow-hidden border border-gray-200 rounded-lg bg-white"
+      onClick={handleCanvasBackgroundClick}
     >
       <svg
         ref={svgRef}
@@ -614,7 +655,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
             const orderIds = Array.isArray(rawIds) ? rawIds : (Array.isArray(cluster) ? cluster : []);
 
             if (!Array.isArray(orderIds) || orderIds.length === 0) return null;
-            
+
             return orderIds.map((idStr, i, arr) => {
               if (i === arr.length - 1) return null;
               const from = pointMap.get(Number(idStr));
@@ -649,6 +690,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
                 key={p.id}
                 onMouseEnter={(e) => showTooltip(p, e)}
                 onMouseMove={(e) => {
+                  if (isPinned) return;
                   if (containerRef.current) {
                     const rect = containerRef.current.getBoundingClientRect();
                     let left = e.clientX - rect.left + 15;
@@ -659,6 +701,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
                   }
                 }}
                 onMouseLeave={hideTooltip}
+                onClick={(e) => pinTooltip(p, e)}
                 style={{ cursor: "pointer" }}
               >
                 <circle
@@ -768,10 +811,23 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
         <div
           className="bg-white border border-gray-300 rounded-lg shadow-xl p-3 text-sm w-[210px]"
           style={tooltipStyle}
+          onClick={(e) => e.stopPropagation()}
         >
-          <div className="font-semibold text-gray-800 border-b border-gray-200 pb-1 mb-2">
-            Order #{hoveredPoint.id}
-            {tooltipOrder && <span className="text-gray-400 text-xs font-normal ml-2">WH: {tooltipOrder.warehouseId}</span>}
+          <div className="flex items-center justify-between border-b border-gray-200 pb-1 mb-2">
+            <div className="font-semibold text-gray-800">
+              Order #{hoveredPoint.id}
+              {tooltipOrder && <span className="text-gray-400 text-xs font-normal ml-2">WH: {tooltipOrder.warehouseId}</span>}
+            </div>
+            {isPinned && (
+              <button
+                onClick={unpinTooltip}
+                className="text-gray-400 hover:text-gray-700 leading-none text-base px-1"
+                aria-label="Close"
+                title="Close"
+              >
+                ×
+              </button>
+            )}
           </div>
           {tooltipOrder ? (
             <div className="text-gray-600 space-y-1.5 text-xs">

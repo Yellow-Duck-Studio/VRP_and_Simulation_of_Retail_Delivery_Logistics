@@ -48,7 +48,7 @@ PIPELINE_ALGOS = {
     "dbscan_eps_0.9": {"algorithm": "dbscan", "eps": 0.9},
 }
 
-def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_prefix="predictions", limit=None):
+def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_prefix="predictions", limit=None, algorithm=None):
     device = torch.device(DEVICE if torch.cuda.is_available() else "cpu")
     tariffs = load_transport_types(transport_csv)
     min_capacity_kg = min(t.max_payload_kg for t in tariffs)
@@ -70,7 +70,8 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_prefix="p
             graphs_cache[inst.task_id, inst.warehouse_id] = graph.to(device)
 
     # Run pipeline for each algorithm config
-    for algo_name, algo_kwargs in PIPELINE_ALGOS.items():
+    algos_to_run = {algorithm: PIPELINE_ALGOS[algorithm]} if algorithm else PIPELINE_ALGOS
+    for algo_name, algo_kwargs in algos_to_run.items():
         print(f"\n{'='*50}\nЗапуск пайплайна для алгоритма: {algo_name}\n{'='*50}")
         results = []
         total_time = 0.0
@@ -136,7 +137,12 @@ def predict(warehouses_csv, orders_csv, transport_csv, model_path, out_prefix="p
         if results:
             print(f"Среднее время decode на склад: {total_time/len(results)*1000:.1f} мс")
 
-        out_path = f"{out_prefix}_{algo_name}.json"
+        # If a specific algorithm was requested, output directly to the prefix path
+        # Otherwise, append algorithm name to prefix
+        if algorithm:
+            out_path = f"{out_prefix}.json"
+        else:
+            out_path = f"{out_prefix}_{algo_name}.json"
         with open(out_path, "w") as f:
             json.dump(results, f, ensure_ascii=False, indent=2)
         print(f"Результаты {algo_name} сохранены в {out_path}")
@@ -152,5 +158,6 @@ if __name__ == "__main__":
     parser.add_argument("--model", default="../GNN/model.pt")
     parser.add_argument("--out-prefix", default="predictions")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument("--algorithm", default=None, choices=list(PIPELINE_ALGOS.keys()))
     args = parser.parse_args()
-    predict(args.warehouses, args.orders, args.transport, args.model, args.out_prefix, args.limit)
+    predict(args.warehouses, args.orders, args.transport, args.model, args.out_prefix, args.limit, args.algorithm)

@@ -1,5 +1,6 @@
 import asyncio
 import glob
+import re
 import subprocess
 import json
 import os
@@ -38,6 +39,67 @@ DATASET_PATHS = {
 }
 
 
+PREDICTIONS_DIR = "data"
+
+# GNN and the evolutionary (main.py) algorithms write their results to two
+# separate, dedicated files. Previously the websocket handler pointed GNN's
+# subprocess at "./data/predictions" but then unconditionally read back
+# "data/master_clusterizations.json" (the evolutionary-algorithms file) for
+# every algorithm, including GNN. That meant a GNN run either crashed with
+# "file not found" on a fresh checkout, or silently returned a stale
+# leftover result from whatever evolutionary algorithm last wrote that file.
+# Keeping the paths distinct, and always reading back the exact path each
+# algorithm was told to write to, removes that whole class of bug.
+CLUSTERING_RESULT_PATH = os.path.join("data", "master_clusterizations.json")
+GNN_RESULT_PATH = os.path.join("data", "gnn_master_result.json")
+
+
+def result_path_for_algorithm(alg: str) -> str:
+    return GNN_RESULT_PATH if alg in STANDALONE_ALGORITHMS else CLUSTERING_RESULT_PATH
+
+# Каноничные имена алгоритмов для UI. Если имя файла не совпадает ни с одним
+# ключом — используем Title Case как fallback, так что новые алгоритмы не
+# ломают парсинг.
+ALGORITHM_DISPLAY_NAMES = {
+    "DBSCAN": "DBSCAN",
+    "CLARKE WRIGHT": "Clarke Wright",
+    "SWEEP": "Sweep",
+    "DESTROY REPAIR": "Destroy & Repair",
+    "RND": "Random",
+    "RANDOM": "Random",
+}
+
+
+def parse_prediction_filename(filename: str) -> dict:
+    """
+    "predictions_clarke_wright.json"  -> algorithm="Clarke Wright", eps=None
+    "predictions_dbscan_eps_0.1.json" -> algorithm="DBSCAN", eps=0.1
+    """
+    base = filename
+    if base.startswith("predictions_"):
+        base = base[len("predictions_"):]
+    if base.endswith(".json"):
+        base = base[: -len(".json")]
+
+    eps = None
+    eps_match = re.search(r"_eps_([\d.]+)$", base)
+    if eps_match:
+        try:
+            eps = float(eps_match.group(1))
+        except ValueError:
+            eps = None
+        base = base[: eps_match.start()]
+
+    algo_key = base.replace("_", " ").strip().upper()
+    display = ALGORITHM_DISPLAY_NAMES.get(algo_key, base.replace("_", " ").title())
+
+    label = f"GNN - {display}"
+    if eps is not None:
+        label += f" (eps={eps:g})"
+
+    return {"algorithm": display, "eps": eps, "label": label}
+
+
 class ClusterRequest(BaseModel):
     algorithms: List[str]
     dataset: Optional[str] = "small"
@@ -61,20 +123,27 @@ async def run_clustering(request: ClusterRequest):
                 raise HTTPException(status_code=400, detail=f"Unknown algorithm: {alg}")
 
             if alg == STANDALONE_ALGORITHMS[0]:
-                subprocess.run([
+                cmd = [
                     "python3", "GNN/predict.py",
                     "--warehouses", paths["warehouses"],
                     "--orders", paths["orders"],
                     "--transport", "./data/transport_types.csv",
                     "--model", "./GNN/model.pt",
-                    "--out", "data/master_clusterizations.json"
-                ], check=True, env=env)
+                    "--out-prefix", GNN_RESULT_PATH.replace(".json", "")
+                ]
+                subprocess.run(cmd, check=True, env=env)
             else:
                 subprocess.run(["python3", "main.py", py_alg_name], check=True, env=env)
 
-            output_path = os.path.join("data", "master_clusterizations.json")
-            with open(output_path, "r", encoding="utf-8") as f:
-                results[alg] = json.load(f)
+            # For GNN, don't read back the result file since it generates multiple algorithm-specific files
+            # The frontend will load specific algorithm results via /api/gnn/{algorithm}
+            if alg not in STANDALONE_ALGORITHMS:
+                output_path = result_path_for_algorithm(alg)
+                with open(output_path, "r", encoding="utf-8") as f:
+                    results[alg] = json.load(f)
+            else:
+                # Return empty result for GNN - frontend loads algorithm-specific data separately
+                results[alg] = []
 
         return results
     except HTTPException:
@@ -122,13 +191,16 @@ async def run_clustering_ws(websocket: WebSocket):
             await websocket.send_json({"type": "algo_start", "algorithm": alg})
 
             if alg == STANDALONE_ALGORITHMS[0]:
-                process = await asyncio.create_subprocess_exec(
+                cmd = [
                     "python3", "-u", "GNN/predict.py",
                     "--warehouses", paths["warehouses"],
                     "--orders", paths["orders"],
                     "--transport", "./data/transport_types.csv",
                     "--model", "./GNN/model.pt",
-                    "--out", "./data/master_clusterizations.json",
+                    "--out-prefix", GNN_RESULT_PATH.replace(".json", ""),
+                ]
+                process = await asyncio.create_subprocess_exec(
+                    *cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.STDOUT,
                     env=env,
@@ -161,12 +233,18 @@ async def run_clustering_ws(websocket: WebSocket):
                 await websocket.close()
                 return
 
-            output_path = os.path.join("data", "master_clusterizations.json")
-            with open(output_path, "r", encoding="utf-8") as f:
-                alg_data = json.load(f)
-
-            results[alg] = alg_data
-            await websocket.send_json({"type": "algo_done", "algorithm": alg, "data": alg_data})
+            # For GNN, don't read back the result file since it generates multiple algorithm-specific files
+            # The frontend will load specific algorithm results via /api/gnn/{algorithm}
+            if alg not in STANDALONE_ALGORITHMS:
+                output_path = result_path_for_algorithm(alg)
+                with open(output_path, "r", encoding="utf-8") as f:
+                    alg_data = json.load(f)
+                results[alg] = alg_data
+                await websocket.send_json({"type": "algo_done", "algorithm": alg, "data": alg_data})
+            else:
+                # Return empty result for GNN - frontend loads algorithm-specific data separately
+                results[alg] = []
+                await websocket.send_json({"type": "algo_done", "algorithm": alg, "data": []})
 
         await websocket.send_json({"type": "done", "results": results})
 
@@ -183,6 +261,66 @@ async def run_clustering_ws(websocket: WebSocket):
             await websocket.close()
         except Exception:
             pass
+
+
+@app.get("/api/predictions/list")
+async def list_prediction_files():
+    pattern = os.path.join(PREDICTIONS_DIR, "predictions_*.json")
+    files = sorted(glob.glob(pattern))
+
+    manifest = []
+    for path in files:
+        filename = os.path.basename(path)
+        meta = parse_prediction_filename(filename)
+        manifest.append({"filename": filename, **meta})
+
+    manifest.sort(key=lambda m: (m["algorithm"], m["eps"] if m["eps"] is not None else -1))
+
+    return {"files": manifest}
+
+
+class PredictionsBatchRequest(BaseModel):
+    filenames: List[str]
+
+
+@app.post("/api/predictions/batch")
+async def load_prediction_files_batch(request: PredictionsBatchRequest):
+    result = {}
+    for filename in request.filenames:
+        safe_name = os.path.basename(filename)
+        path = os.path.join(PREDICTIONS_DIR, safe_name)
+
+        if not os.path.isfile(path):
+            result[safe_name] = {"error": "File not found"}
+            continue
+
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                result[safe_name] = json.load(f)
+        except Exception as e:
+            result[safe_name] = {"error": str(e)}
+
+    return result
+
+
+@app.get("/api/gnn/{algorithm}")
+async def load_gnn_algorithm_result(algorithm: str):
+    """
+    Load a specific GNN algorithm result file generated by predict.py.
+    gnn_master_result_{algorithm}.json
+    """
+    safe_algo = algorithm.replace("..", "").replace("/", "").replace("\\", "")
+    filename = f"gnn_master_result_{safe_algo}.json"
+    path = os.path.join(PREDICTIONS_DIR, filename)
+
+    if not os.path.isfile(path):
+        raise HTTPException(status_code=404, detail=f"GNN result file not found: {filename}")
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 class SimulationConfig(BaseModel):
