@@ -1,5 +1,5 @@
 {
-  "_comment": "Loads cleanly (every field respects the pydantic schema - positive capacity/mass, valid enums, valid ISO timestamps, all courier/warehouse references resolve) so the simulation runs to completion. The defects are all things TripConnectionValidator (route_validator.py) checks *after* loading, not things pydantic checks at load time: (1) ROUTE_FOOT_001 has two stops sharing sequence_number 2 -> guaranteed ERROR (SEQUENCE_GAP_OR_DUPLICATE), plus the resulting non-contiguous {1,2,4} sequence set also raises a WARNING for the same route. (2) The WH_PEREKRESTOK_INNOPOLIS -> ORD004 entry is missing from distance_matrix, so that hop silently falls back to a haversine estimate -> MISSING_DISTANCE_ENTRY (ERROR if ValidationConfig.require_distance_matrix_entry is on, WARNING otherwise - either way it shows up in issues_by_type). Nothing here relies on dangling courier/courier_type ids, since those are actually used by the simulation engine at runtime and would crash the whole run rather than just show up in the validation report.",
+  "_comment": "Loads cleanly (every field respects the pydantic schema - positive capacity/mass, valid enums, valid ISO timestamps, all courier/warehouse references resolve) so the simulation runs to completion. The defects are all things TripConnectionValidator (route_validator.py) checks *after* loading, not things pydantic checks at load time: (1) ROUTE_FOOT_001 has two stops sharing sequence_number 2 -> guaranteed ERROR (SEQUENCE_GAP_OR_DUPLICATE), plus the resulting non-contiguous {1,2,4} sequence set also raises a WARNING for the same route. (2) The WH_PEREKRESTOK_INNOPOLIS -> ORD004 entry is missing from distance_matrix, so that hop silently falls back to a haversine estimate -> MISSING_DISTANCE_ENTRY (ERROR if ValidationConfig.require_distance_matrix_entry is on, WARNING otherwise - either way it shows up in Issues By Type). Nothing here relies on dangling courier/courier_type ids, since those are actually used by the simulation engine at runtime and would crash the whole run rather than just show up in the validation report.",
   "courier_types": [
     {
       "type_id": "car",
@@ -47,10 +47,7 @@
         "longitude": 48.7450,
         "address": "Иннополис, ул. Университетская, д. 10, кв. 25"
       },
-      "delivery_time_window": {
-        "start": "2024-06-17T09:00:00",
-        "end": "2024-06-17T12:00:00"
-      },
+      "delivery_time_window_end": "2024-06-17T12:00:00",
       "mass_kg": 5.0,
       "ready_time": "2024-06-17T09:30:00"
     },
@@ -62,10 +59,7 @@
         "longitude": 48.7400,
         "address": "Иннополис, ул. Спортивная, д. 15, кв. 42"
       },
-      "delivery_time_window": {
-        "start": "2024-06-17T11:00:00",
-        "end": "2024-06-17T13:00:00"
-      },
+      "delivery_time_window_end": "2024-06-17T11:00:00",
       "mass_kg": 8.0,
       "ready_time": "2024-06-17T10:30:00"
     },
@@ -77,10 +71,7 @@
         "longitude": 48.7500,
         "address": "Иннополис, ул. Технопарк, д. 8, кв. 12"
       },
-      "delivery_time_window": {
-        "start": "2024-06-17T12:00:00",
-        "end": "2024-06-17T14:00:00"
-      },
+      "delivery_time_window_end": "2024-06-17T14:00:00",
       "mass_kg": 3.0,
       "ready_time": "2024-06-17T11:30:00"
     },
@@ -92,10 +83,7 @@
         "longitude": 48.7465,
         "address": "Иннополис, ул. Инновационная, д. 20, кв. 5"
       },
-      "delivery_time_window": {
-        "start": "2024-06-17T13:00:00",
-        "end": "2024-06-17T15:00:00"
-      },
+      "delivery_time_window_end": "2024-06-17T15:00:00",
       "mass_kg": 12.0,
       "ready_time": "2024-06-17T12:30:00"
     },
@@ -107,10 +95,7 @@
         "longitude": 48.7435,
         "address": "Иннополис, ул. Научная, д. 3, кв. 88"
       },
-      "delivery_time_window": {
-        "start": "2024-06-17T14:00:00",
-        "end": "2024-06-17T16:00:00"
-      },
+      "delivery_time_window_end": "2024-06-17T16:00:00",
       "mass_kg": 2.0,
       "ready_time": "2024-06-17T13:30:00"
     }
@@ -170,14 +155,12 @@
           "order_id": "ORD001",
           "location": { "latitude": 55.7544, "longitude": 48.7420 },
           "stop_type": "pickup",
-          "sequence_number": 1,
           "service_duration_minutes": 5
         },
         {
           "order_id": "ORD001",
           "location": { "latitude": 55.7560, "longitude": 48.7450 },
           "stop_type": "delivery",
-          "sequence_number": 2,
           "service_duration_minutes": 3
         }
       ]
@@ -195,28 +178,24 @@
           "order_id": "ORD002",
           "location": { "latitude": 55.7544, "longitude": 48.7420 },
           "stop_type": "pickup",
-          "sequence_number": 1,
           "service_duration_minutes": 5
         },
         {
           "order_id": "ORD002",
           "location": { "latitude": 55.7535, "longitude": 48.7400 },
           "stop_type": "delivery",
-          "sequence_number": 2,
           "service_duration_minutes": 3
         },
         {
           "order_id": "ORD005",
           "location": { "latitude": 55.7544, "longitude": 48.7420 },
           "stop_type": "pickup",
-          "sequence_number": 2,
           "service_duration_minutes": 5
         },
         {
           "order_id": "ORD005",
           "location": { "latitude": 55.7525, "longitude": 48.7435 },
           "stop_type": "delivery",
-          "sequence_number": 4,
           "service_duration_minutes": 3
         }
       ]
@@ -233,14 +212,12 @@
           "order_id": "ORD003",
           "location": { "latitude": 55.7520, "longitude": 48.7480 },
           "stop_type": "pickup",
-          "sequence_number": 1,
           "service_duration_minutes": 5
         },
         {
           "order_id": "ORD003",
           "location": { "latitude": 55.7510, "longitude": 48.7500 },
           "stop_type": "delivery",
-          "sequence_number": 2,
           "service_duration_minutes": 3
         }
       ]
@@ -258,14 +235,12 @@
           "order_id": "ORD004",
           "location": { "latitude": 55.7520, "longitude": 48.7480 },
           "stop_type": "pickup",
-          "sequence_number": 1,
           "service_duration_minutes": 5
         },
         {
           "order_id": "ORD004",
           "location": { "latitude": 55.7555, "longitude": 48.7465 },
           "stop_type": "delivery",
-          "sequence_number": 2,
           "service_duration_minutes": 3
         }
       ]

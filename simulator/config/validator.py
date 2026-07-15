@@ -11,9 +11,7 @@ class ValidationSeverity(str, Enum):
 
 class ValidationIssueType(str, Enum):
     MISSING_DISTANCE_ENTRY = "missing_distance_entry"
-    SEQUENCE_GAP_OR_DUPLICATE = "sequence_gap_or_duplicate"
     DUPLICATE_STOP = "duplicate_stop"
-    OUTLIER_HOP_DISTANCE = "outlier_hop_distance"
     ROUTE_DISCONTINUITY = "route_discontinuity"
     MISSING_COURIER_TYPE = "missing_courier_type"
     MISSING_COURIER = "missing_courier"
@@ -39,10 +37,6 @@ class ValidationIssue:
 
 @dataclass
 class ValidationConfig:
-    # Hops further than mean + N * stdev (within a route) are flagged as
-    # statistical outliers. Requires >= min_hops_for_outlier_check hops.
-    outlier_std_multiplier: float = 3.0
-    min_hops_for_outlier_check: int = 4
     # If True, a missing distance-matrix entry (i.e. silent haversine
     # fallback) is an ERROR. If False, it's a WARNING.
     require_distance_matrix_entry: bool = True

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from simulator.engine import SimulationController, EventManager, StateManager
 from simulator.fsm.courier_fsm import CourierFSM
 from simulator.schemas import (
-    Location, CourierType, Courier, Order, TimeWindow,
+    Location, CourierType, Courier, Order,
     DistanceMatrix, AffiliationType, CourierStatus
 )
 from simulator.utils import PaymentCalculator
@@ -78,7 +78,7 @@ def test_add_payment():
         order_id="ord_1",
         warehouse_id="wh_1",
         delivery_location=Location(latitude=55.75, longitude=37.61),
-        delivery_time_window=TimeWindow(start=datetime.now(), end=datetime.now()+timedelta(hours=1)),
+        delivery_time_window_end=datetime.now()+timedelta(hours=1),
         mass_kg=5.0,
         ready_time=datetime.now()
     )

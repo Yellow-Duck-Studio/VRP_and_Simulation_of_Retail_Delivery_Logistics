@@ -50,11 +50,16 @@ def main():
         help="Path to output JSON file for results"
     )
     parser.add_argument(
+        "--report",
+        type=str,
+        default="report.txt",
+        help="Path to output txt file for report"
+    )
+    parser.add_argument(
         "--strict",
         action="store_true",
         help="Fail fast if validation fails"
     )
-
     parser.add_argument(
         "--log-level",
         type=str,
@@ -90,38 +95,48 @@ def main():
         strict_validation=args.strict
     )
 
+    logger.info(f"{Colors.BLUE}-------------------------------- Data Loading --------------------------------{Colors.RESET}")
     logger.info(f"Loading simulation data from {input_path}...")
     load_simulation_data(str(input_path), controller.state_manager)
 
-    logger.debug(f"{Colors.BLUE}-------------------------------- Warehouses --------------------------------{Colors.RESET}")
+    logger.debug(f"{Colors.BLUE}--------------------------------- Warehouses ---------------------------------{Colors.RESET}")
     for wh_id, wh in controller.state_manager.warehouses.items():
-        logger.debug(f"  {wh_id}: {wh.location.address or 'No address'}")
-        logger.debug(f"    Location: ({wh.location.latitude:.4f}, {wh.location.longitude:.4f})")
+        logger.debug(f"{wh_id}: {wh.location.address or 'No address'}")
+        logger.debug(f"  Location: ({wh.location.latitude:.4f}, {wh.location.longitude:.4f})")
 
-    logger.debug(f"{Colors.BLUE}------------------------------- Courier Types -------------------------------{Colors.RESET}")
+    logger.debug(f"{Colors.BLUE}-------------------------------- Courier Types -------------------------------{Colors.RESET}")
     for ct_id, ct in controller.state_manager.courier_types.items():
-        logger.debug(f"  {ct_id}: {ct.name}")
-        logger.debug(f"    Capacity: {ct.capacity_kg} kg, Speed: {ct.speed_kmh} km/h")
+        logger.debug(f"{ct_id}: {ct.name}")
+        logger.debug(f"  Capacity: {ct.capacity_kg} kg, Speed: {ct.speed_kmh} km/h")
 
-    logger.debug(f"{Colors.BLUE}---------------------------------- Couriers ---------------------------------{Colors.RESET}")
+    logger.debug(f"{Colors.BLUE}----------------------------------- Couriers ---------------------------------{Colors.RESET}")
     for c_id, courier in controller.state_manager.couriers.items():
         ct = controller.state_manager.courier_types.get(courier.courier_type_id)
-        logger.debug(f"  {c_id}: {ct.name if ct else 'Unknown'}")
-        logger.debug(f"    Status: {courier.status}, Load: {courier.current_load} kg")
-        logger.debug(f"    Location: ({courier.current_location.latitude:.4f}, {courier.current_location.longitude:.4f})")
+        logger.debug(f"{c_id}: {ct.name if ct else 'Unknown'}")
+        logger.debug(f"  Status: {courier.status}, Load: {courier.current_load} kg")
+        logger.debug(f"  Location: ({courier.current_location.latitude:.4f}, {courier.current_location.longitude:.4f})")
 
-    logger.debug(f"{Colors.BLUE}---------------------------------- Orders ----------------------------------{Colors.RESET}")
+    logger.debug(f"{Colors.BLUE}----------------------------------- Orders -----------------------------------{Colors.RESET}")
     for o_id, order in controller.state_manager.orders.items():
-        logger.debug(f"    Warehouse ID: {order.warehouse_id}")
-        logger.debug(f"    Mass: {order.mass_kg} kg")
-        logger.debug(f"    Time Window: {order.delivery_time_window.start.strftime('%H:%M')} - {order.delivery_time_window.end.strftime('%H:%M')}")
-        logger.debug(f"    Ready Time: {order.ready_time.strftime('%H:%M')}")
-        logger.debug(f"    Status: {order.status}")
+        logger.debug(f"  Warehouse ID: {order.warehouse_id}")
+        logger.debug(f"  Mass: {order.mass_kg} kg")
+        logger.debug(f"  Delivery Window End: {order.delivery_time_window_end.strftime('%H:%M')}")
+        logger.debug(f"  Ready Time: {order.ready_time.strftime('%H:%M')}")
+        logger.debug(f"  Status: {order.status}")
 
-    logger.info(f"{Colors.BLUE}----------------------------- Running Simulation -----------------------------{Colors.RESET}")
-    logger.info(f"Start Time: {start_time.isoformat()}")
-    logger.info(f"Time Step: {args.time_step} minutes")
-    logger.info(f"Max Steps: {args.max_steps}")
+    logger.info(f"{Colors.BLUE}------------------------------ Validation Summary ----------------------------{Colors.RESET}")
+    validation_report = controller.validate_routes()
+    for key, value in validation_report.summary.items():
+        if isinstance(value, dict):
+            dict_items = ", ".join([f"{k.upper()}: {v}" for k, v in value.items()])
+            logger.info(f"{key}: {dict_items}")
+        else:
+            logger.info(f"{key}: {value}")
+
+    logger.debug(f"{Colors.BLUE}----------------------------- Running Simulation -----------------------------{Colors.RESET}")
+    logger.debug(f"Start Time: {start_time.isoformat()}")
+    logger.debug(f"Time Step: {args.time_step} minutes")
+    logger.debug(f"Max Steps: {args.max_steps}")
 
     controller.run(max_steps=args.max_steps)
 
@@ -129,46 +144,79 @@ def main():
     metrics = controller.get_metrics()
     for key, value in metrics.items():
         if isinstance(value, float):
-            if "rate" in key:
-                logger.info(f"  {key}: {value:.2%}")
+            if "Rate" in key:
+                logger.info(f"{key}: {value:.2%}")
             else:
-                logger.info(f"  {key}: {value:.2f}")
+                logger.info(f"{key}: {value:.2f}")
         else:
-            logger.info(f"  {key}: {value}")
-
-    logger.info(f"{Colors.BLUE}------------------------------ Validation Summary ----------------------------{Colors.RESET}")
-    validation_report = controller.get_validation_report()
-    for key, value in validation_report.summary.items():    
-        if isinstance(value, dict):
-            dict_items = ", ".join([f"{k.upper()}: {v}" for k, v in value.items()])
-            logger.info(f"  {key}: {dict_items}")
-        else:
-            logger.info(f"  {key}: {value}")
+            logger.info(f"{key}: {value}")
 
     logger.info(f"{Colors.BLUE}-------------------------------- Event Summary -------------------------------{Colors.RESET}")
     events = controller.event_manager.get_events()
-    logger.info(f"  Total Events: {len(events)}")
+    logger.info(f"Total Events: {len(events)}")
 
     from simulator.engine import EventType
     for event_type in EventType:
         event_count = len(controller.event_manager.get_events(event_type))
         if event_count > 0:
-            logger.info(f"  {event_type.value}: {event_count}")
+            logger.info(f"{event_type.value}: {event_count}")
 
     results = controller.get_results()
 
     logger.info(f"{Colors.BLUE}------------------------------ Delivery Results ------------------------------{Colors.RESET}")
     for order_id, delivery_time in results["order_delivery_times"].items():
         in_window = results["order_delivered_in_window"][order_id]
-        logger.info(f"  Order {order_id}: delivered at {delivery_time}, in window: {in_window}")
+        logger.info(f"Order {order_id}: delivered at {delivery_time}, in window: {in_window}")
 
     logger.info(f"{Colors.BLUE}------------------------------ Courier Payments ------------------------------{Colors.RESET}")
     for courier_id, payment in results["courier_payments"].items():
-        logger.info(f"  Courier {courier_id}: {payment:.2f} rub")
+        logger.info(f"Courier {courier_id}: {payment:.2f} rub")
 
-    logger.info(f"  Total delivery cost: {results['total_delivery_cost']:.2f} rub")
+    logger.info(f"Total Delivery Cost: {results['total_delivery_cost']:.2f} rub")
 
-    # Save results if output path specified
+    logger.info(f"{Colors.BLUE}------------------------------------ Info ------------------------------------{Colors.RESET}")
+
+    report_path = Path(args.report)
+
+    lines = [f"----------------------------- Simulation Results -----------------------------"]
+    metrics = controller.get_metrics()
+    for key, value in metrics.items():
+        if isinstance(value, float):
+            if "Rate" in key:
+                lines.append(f"{key}: {value:.2%}")
+            else:
+                lines.append(f"{key}: {value:.2f}")
+        else:
+            lines.append(f"{key}: {value}")
+
+    lines.append(f"-------------------------------- Event Summary -------------------------------")
+    events = controller.event_manager.get_events()
+    lines.append(f"Total Events: {len(events)}")
+
+    from simulator.engine import EventType
+    for event_type in EventType:
+        event_count = len(controller.event_manager.get_events(event_type))
+        if event_count > 0:
+            lines.append(f"{event_type.value}: {event_count}")
+
+    results = controller.get_results()
+
+    lines.append(f"------------------------------ Delivery Results ------------------------------")
+    for order_id, delivery_time in results["order_delivery_times"].items():
+        in_window = results["order_delivered_in_window"][order_id]
+        lines.append(f"Order {order_id}: delivered at {delivery_time}, in window: {in_window}")
+
+    lines.append(f"------------------------------ Courier Payments ------------------------------")
+    for courier_id, payment in results["courier_payments"].items():
+        lines.append(f"Courier {courier_id}: {payment:.2f} rub")
+
+    lines.append(f"Total Delivery Cost: {results['total_delivery_cost']:.2f} rub")
+
+    with open(report_path, 'w', encoding='utf-8') as f:
+        f.write("\n".join(lines))
+
+    logger.info(f"Report saved to {args.report}")
+
     if args.output:
         output_path = Path(args.output)
         results_json = {

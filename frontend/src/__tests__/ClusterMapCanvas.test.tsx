@@ -7,7 +7,7 @@ import * as api from '../api';
 vi.mock('../api');
 const mockedApi = vi.mocked(api);
 
-// ─── Real timers for animation intervals, etc. ──
+// ─── Real timers for animation intervals ──────
 beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
@@ -66,14 +66,14 @@ const waitForDataLoaded = async () => {
 // ═══════════════════════════════════════════════
 describe('ClusterMapCanvas – idle / running states', () => {
   it('shows idle animation when no clusters and not running', async () => {
-    render(<ClusterMapCanvas clusters={[]} taskId={0} />);
+    render(<ClusterMapCanvas clusters={[]} taskId="0" dataset="small" />);
     await waitForDataLoaded();
 
     expect(screen.getByText(/Idle Fleet Mileage/)).toBeInTheDocument();
   });
 
   it('shows running animation when isRunning is true', async () => {
-    render(<ClusterMapCanvas clusters={[]} taskId={0} isRunning />);
+    render(<ClusterMapCanvas clusters={[]} taskId="0" dataset="small" isRunning />);
     await waitForDataLoaded();
 
     expect(screen.getByText(/Clusterization in progress/)).toBeInTheDocument();
@@ -83,7 +83,8 @@ describe('ClusterMapCanvas – idle / running states', () => {
 // ═══════════════════════════════════════════════
 describe('ClusterMapCanvas – with clusters', () => {
   it('renders order points and warehouses', async () => {
-    render(<ClusterMapCanvas clusters={[{ order_ids: [1], order_sequence: null }]} taskId={0} />);
+    const cluster = { order_ids: [1], order_sequence: null };
+    render(<ClusterMapCanvas clusters={[cluster]} taskId="0" dataset="small" />);
     await waitForDataLoaded();
 
     await waitFor(() => {
@@ -94,7 +95,8 @@ describe('ClusterMapCanvas – with clusters', () => {
   });
 
   it('shows tooltip on order hover', async () => {
-    render(<ClusterMapCanvas clusters={[{ order_ids: [1], order_sequence: null }]} taskId={0} />);
+    const cluster = { order_ids: [1], order_sequence: null };
+    render(<ClusterMapCanvas clusters={[cluster]} taskId="0" dataset="small" />);
     await waitForDataLoaded();
 
     await waitFor(() => screen.getByText('1'));
@@ -112,7 +114,8 @@ describe('ClusterMapCanvas – with clusters', () => {
   });
 
   it('shows warehouse tooltip on hover', async () => {
-    render(<ClusterMapCanvas clusters={[{ order_ids: [1], order_sequence: null }]} taskId={0} />);
+    const cluster = { order_ids: [1], order_sequence: null };
+    render(<ClusterMapCanvas clusters={[cluster]} taskId="0" dataset="small" />);
     await waitForDataLoaded();
 
     await waitFor(() => screen.getByText('W10'));
@@ -130,16 +133,18 @@ describe('ClusterMapCanvas – with clusters', () => {
 // ═══════════════════════════════════════════════
 describe('ClusterMapCanvas – zoom controls', () => {
   it('has zoom in, zoom out, and reset buttons', async () => {
-    render(<ClusterMapCanvas clusters={[[1]]} taskId={0} />);
+    const cluster = { order_ids: [1], order_sequence: null };
+    render(<ClusterMapCanvas clusters={[cluster]} taskId="0" dataset="small" />);
     await waitForDataLoaded();
     await waitFor(() => screen.getByText('1'));
 
     const buttons = screen.getAllByRole('button');
-    expect(buttons.length).toBe(3);  // zoom in, zoom out, reset
+    expect(buttons).toHaveLength(3);
   });
 
   it('changes transform scale when zoom in is clicked', async () => {
-    render(<ClusterMapCanvas clusters={[[1]]} taskId={0} />);
+    const cluster = { order_ids: [1], order_sequence: null };
+    render(<ClusterMapCanvas clusters={[cluster]} taskId="0" dataset="small" />);
     await waitForDataLoaded();
     await waitFor(() => screen.getByText('1'));
 

@@ -27,8 +27,8 @@ def test_single_pickup_and_delivery_per_order_is_valid(fake_resolver):
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.01, 48.0)
     stops = [
-        make_stop("ORD1", wh, StopType.PICKUP, 1, arrival=BASE_TIME + minutes(5)),
-        make_stop("ORD1", delivery, StopType.DELIVERY, 2, arrival=BASE_TIME + minutes(15)),
+        make_stop("ORD1", wh, StopType.PICKUP, arrival=BASE_TIME + minutes(5)),
+        make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(15)),
     ]
     route = _route_with_stops("R1", stops)
     validator = build_validator([make_courier("C1")], [make_courier_type()], [route], fake_resolver)
@@ -40,9 +40,9 @@ def test_duplicate_delivery_stop_for_same_order_is_an_error(fake_resolver):
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.01, 48.0)
     stops = [
-        make_stop("ORD1", wh, StopType.PICKUP, 1, arrival=BASE_TIME + minutes(5)),
-        make_stop("ORD1", delivery, StopType.DELIVERY, 2, arrival=BASE_TIME + minutes(15)),
-        make_stop("ORD1", delivery, StopType.DELIVERY, 3, arrival=BASE_TIME + minutes(25)),
+        make_stop("ORD1", wh, StopType.PICKUP, arrival=BASE_TIME + minutes(5)),
+        make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(15)),
+        make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(25)),
     ]
     route = _route_with_stops("R2", stops)
     validator = build_validator([make_courier("C1")], [make_courier_type()], [route], fake_resolver)
@@ -60,8 +60,8 @@ def test_pickup_and_delivery_for_same_order_are_not_flagged_as_duplicates(fake_r
     wh = make_location(55.0, 48.0)
     delivery = make_location(55.01, 48.0)
     stops = [
-        make_stop("ORD1", wh, StopType.PICKUP, 1, arrival=BASE_TIME + minutes(5)),
-        make_stop("ORD1", delivery, StopType.DELIVERY, 2, arrival=BASE_TIME + minutes(15)),
+        make_stop("ORD1", wh, StopType.PICKUP, arrival=BASE_TIME + minutes(5)),
+        make_stop("ORD1", delivery, StopType.DELIVERY, arrival=BASE_TIME + minutes(15)),
     ]
     route = _route_with_stops("R3", stops)
     validator = build_validator([make_courier("C1")], [make_courier_type()], [route], fake_resolver)

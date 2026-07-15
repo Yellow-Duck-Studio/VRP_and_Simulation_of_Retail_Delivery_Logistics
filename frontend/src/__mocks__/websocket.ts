@@ -30,7 +30,10 @@ export class MockWebSocket {
   static readonly CLOSING = 2;
   static readonly CLOSED = 3;
 
-  constructor(public url: string) {}
+  url: string;
+  constructor(url: string) {
+    this.url = url;
+  }
 
   // ── Simulation helpers ──────────────────────
   simulateOpen() {

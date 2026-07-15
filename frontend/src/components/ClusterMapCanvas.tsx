@@ -14,7 +14,7 @@ import {
 import {MapIcon, MinusIcon, PlusIcon,} from '@heroicons/react/24/outline';
 
 export interface ClusterMapProps {
-  clusters: Array<{ order_ids: number[]; order_sequence: number[] | null; transport_type?: string }>;
+  clusters: Array<{ order_ids: number[]; transport_type?: string }>;
   taskId: number | string;
   dataset: string;
   isRunning?: boolean;
@@ -208,7 +208,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
     let fallbackSpiralIdx = 0;
 
     clusters.forEach((cluster, ci) => {
-      const rawIds = cluster.order_sequence || cluster.order_ids;
+      const rawIds = cluster.order_ids;
       const orderIds = Array.isArray(rawIds) ? rawIds : (Array.isArray(cluster) ? cluster : []);
       const transportType = cluster.transport_type;
 
@@ -651,7 +651,7 @@ export default function ClusterMap({ clusters, taskId, dataset, isRunning = fals
         <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
           {hoveredClusterIdx !== null && (() => {
             const cluster = clusters[hoveredClusterIdx];
-            const rawIds = cluster.order_sequence || cluster.order_ids;
+            const rawIds = cluster.order_ids;
             const orderIds = Array.isArray(rawIds) ? rawIds : (Array.isArray(cluster) ? cluster : []);
 
             if (!Array.isArray(orderIds) || orderIds.length === 0) return null;
