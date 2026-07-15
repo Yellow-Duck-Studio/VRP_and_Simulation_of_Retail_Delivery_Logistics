@@ -92,7 +92,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--warehouses", required=True)
     parser.add_argument("--orders", required=True)
-    parser.add_argument("--transport", required=True)
+    parser.add_argument("--transport", required=False, default= "data/transport_types.csv")
     parser.add_argument("--solutions", required=True)
     parser.add_argument("--out", default="model.pt")
     args = parser.parse_args()

@@ -63,11 +63,9 @@ function orderKey(taskId: number | string, orderId: number | string): string {
   return `${taskId}_${orderId}`;
 }
 
-// The clustering backend returns polygon/task keys as "task_2", "task_10", etc,
-// while orders.csv has the bare numeric task_id (2, 10, ...). Strip any non-digit
-// prefix so both sides resolve to the same numeric id.
-function normalizeTaskId(taskId: number | string): number {
+function normalizeTaskId(taskId: number | string | undefined | null): number {
   if (typeof taskId === "number") return taskId;
+  if (!taskId) return NaN;
   const match = taskId.match(/(\d+)/);
   return match ? parseInt(match[0], 10) : NaN;
 }
@@ -199,15 +197,10 @@ export interface ClusterProgressEvent {
   results?: AllResults;
 }
 
-/**
- * Runs the requested algorithms via the /ws/cluster WebSocket endpoint and
- * streams live progress (subprocess log lines, per-algorithm completion)
- * through `onEvent` as it happens. Resolves with the same combined results
- * shape as `runClustering` once everything is done.
- */
 export function runClusteringWithProgress(
   algorithms: string[],
   dataset: string,
+  gnnAlgorithm: string | undefined,
   onEvent: (event: ClusterProgressEvent) => void
 ): Promise<AllResults> {
   return new Promise((resolve, reject) => {
@@ -215,7 +208,7 @@ export function runClusteringWithProgress(
     const ws = new WebSocket(`${WS_BASE_URL}/ws/cluster`);
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ algorithms, dataset }));
+      ws.send(JSON.stringify({ algorithms, dataset, gnn_algorithm: gnnAlgorithm }));
     };
 
     ws.onmessage = (event) => {
@@ -281,4 +274,119 @@ export async function runSimulation(config: SimulationConfig = {}): Promise<stri
   }
 
   return await response.text();
+}
+
+export const sortTaskKeys = (keys: string[]): string[] => {
+  return [...keys].sort((a, b) => {
+    const numA = parseInt(a.replace(/\D/g, ""), 10) || 0;
+    const numB = parseInt(b.replace(/\D/g, ""), 10) || 0;
+    return numA - numB;
+  });
+};
+
+export const getTasksFromAlgoData = (algoData: AlgorithmResults): string[] => {
+  if (!algoData) return [];
+  if (Array.isArray(algoData)) {
+    const keys = algoData.map((item: GnnTaskResult) => {
+      const id = item.task_id;
+      return typeof id === "string" && id.startsWith("task_") ? id : `task_${id}`;
+    });
+    return sortTaskKeys([...new Set(keys)]);
+  }
+  return sortTaskKeys(Object.keys(algoData));
+};
+
+export const getVariantsFromAlgoData = (
+  algoData: AlgorithmResults,
+  taskKey: string
+): ClusterizationVariant[] => {
+  if (!algoData || !taskKey) return [];
+
+  if (Array.isArray(algoData)) {
+    const rawId = taskKey.replace("task_", "");
+    const allFound = algoData.filter(
+      (item: GnnTaskResult) => String(item.task_id) === taskKey || String(item.task_id) === rawId
+    );
+
+    if (allFound.length === 0) return [];
+
+    const mergedClusters = allFound.flatMap((item: GnnTaskResult) =>
+      item.clusters.map((c: GnnClusterData) => {
+        const sequence = c.order_sequence || c.order_ids || [];
+
+        return {
+          order_ids: sequence.map((id: string | number) => Number(id)),
+          transport_type: c.transport || "unknown",
+          warehouse_id: Number(item.warehouse_id),
+        };
+      })
+    );
+
+    const totalScore = allFound.reduce(
+      (acc, item) =>
+        acc + item.clusters.reduce((cAcc: number, c: GnnClusterData) => cAcc + (c.cost || 0), 0),
+      0
+    );
+
+    const isValid = allFound.every((item) =>
+      item.clusters.every((c: GnnClusterData) => c.feasible !== false)
+    );
+
+    return [
+      {
+        clusterization_id: 1,
+        fitness_score: totalScore,
+        is_valid: isValid,
+        clusters: mergedClusters,
+      },
+    ];
+  }
+
+  return (algoData as Record<string, ClusterizationVariant[]>)[taskKey] || [];
+};
+
+export interface PredictionFileMeta {
+  filename: string;
+  algorithm: string;
+  eps: number | null;
+  label: string;
+}
+
+export async function listPredictionFiles(): Promise<PredictionFileMeta[]> {
+  const response = await fetch(`${API_BASE_URL}/predictions/list`);
+  if (!response.ok) {
+    throw new Error("Failed to load predictions manifest");
+  }
+  const data = await response.json();
+  return data.files ?? [];
+}
+
+export type PredictionFileContent = GnnTaskResult[] | { error: string };
+
+export async function loadPredictionFilesBatch(
+  filenames: string[]
+): Promise<Record<string, PredictionFileContent>> {
+  const response = await fetch(`${API_BASE_URL}/predictions/batch`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ filenames }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Failed to load prediction file batch");
+  }
+
+  return await response.json();
+}
+
+export async function loadGnnAlgorithmResult(algorithm: string): Promise<GnnTaskResult[]> {
+  const response = await fetch(`${API_BASE_URL}/gnn/${algorithm}`);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load GNN result for algorithm: ${algorithm}`);
+  }
+
+  return await response.json();
 }
